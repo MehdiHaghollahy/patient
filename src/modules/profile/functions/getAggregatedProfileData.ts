@@ -14,6 +14,7 @@ import { QueryClient, dehydrate } from '@tanstack/react-query';
 import axios from 'axios';
 import isEmpty from 'lodash/isEmpty';
 import { getAverageWaitingTime } from './getAverageWaitingTime';
+import { formatDoctorCitiesForTitle } from './getDoctorCities';
 import { getProfile } from './getProfileData';
 import { getRateDetailsData } from './getRateDetailsData';
 import { OverwriteProfileData, overwriteProfileData } from './overwriteProfileData';
@@ -527,10 +528,8 @@ export async function getAggregatedProfileData(
   }
 
   // Step 5: Construct the final props object
-  const doctorCity = centers?.find?.((center: any) => center.id !== IGNORED_CENTER_ID)?.city;
-  const title = `${information?.display_name}، ${expertises?.expertises?.[0]?.alias_title} ${
-    doctorCity ? `${doctorCity}،` : ''
-  } نوبت دهی آنلاین و شماره تلفن`;
+  const doctorCitiesLabel = formatDoctorCitiesForTitle(centers);
+  const title = `${information?.display_name}، ${expertises?.expertises?.[0]?.alias_title} ${doctorCitiesLabel} نوبت دهی آنلاین و شماره تلفن`;
   const description = `نوبت دهی اینترنتی ${information?.display_name}، آدرس مطب، شماره تلفن و اطلاعات تماس با امکان رزرو وقت و نوبت دهی آنلاین در اپلیکیشن و سایت پذیرش۲۴`;
 
   const finalProps = {
