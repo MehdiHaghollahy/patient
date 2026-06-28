@@ -12,6 +12,7 @@ import classNames from '@/common/utils/classNames';
 import Hamdast from '@/modules/hamdast/render';
 import { Fragment2 } from '@/common/fragment/fragment2';
 import ProfileFallback from '@/modules/hamdast/profileFallback';
+import { getProfileSeoSectionData } from '@/modules/profile/functions/buildProfileSeoAboutHtml';
 
 const { publicRuntimeConfig } = config();
 
@@ -244,52 +245,36 @@ export const sections = (data: any) => {
     {
       isShow: customize.showSeoBoxs,
       function: () => {
-        const center = centers?.find?.((item: any) => item?.center_type === 1) ?? centers?.[0];
-        const isOnlineVisitCenter = center?.id === CENTERS.CONSULT;
-        const doctorExpertise = `${expertises?.expertises?.[0]?.degree_name ?? ''} ${expertises?.expertises?.[0]?.expertise_name ?? ''}`;
-        const about = `<p>${information.display_name}، ${doctorExpertise ?? 'سایر'} در شهر ${center?.city ?? '(ثبت نشده)'} است. مطب ${information.display_name
-          } در ${center?.address ?? '(ثبت نشده)'} واقع شده است که در صورت نیاز می‌توانید با شماره <span class="inline-block">${!isOnlineVisitCenter && !!center?.display_number_array[0] ? center?.display_number_array[0] : '(ثبت نشده)'
-          }</span> تماس بگیرید.</p>
-        <p>تاکنون   ${convertLongToCompactNumber(history?.count_of_page_view) ?? 0} نفر از پروفایل ${information.display_name}، ${doctorExpertise ?? 'سایر'
-          }  بازدید کرده‌اند؛ ${!feedbacks?.details?.hide_rates
-            ? `همچنین ${+(
-              (+(feedbacks?.details?.average_rates?.average_quality_of_treatment ?? 0) +
-                +(feedbacks?.details?.average_rates?.average_doctor_encounter ?? 0) +
-                +(feedbacks?.details?.average_rates?.average_explanation_of_issue ?? 0)) /
-              3
-            )?.toFixed(1) * 20
-            }٪ مراجعین (${feedbacks?.details?.count_of_feedbacks ?? 0} نظر ثبت شده) از ایشان رضایت داشته‌اند. <b>نظرات ${information.display_name
-            }</b> در پروفایل دکتر در پذیرش۲۴  قابل مشاهده است.</p>`
-            : ''
-          }
-        ${center?.freeturn_text
-            ? `<p>زودترین زمان رزرو نوبت از مطب ${information.display_name} ${center?.freeturn_text} می‌باشد که می‌توانید از طریق وبسایت و یا اپلیکیشن نوبت‌دهی پذیرش۲۴ نوبت خود را به صورت اینترنتی و غیرحضوری دریافت کنید.</p>`
-            : ''
-          }
-        <p>اگر زمان کافی برای مراجعه حضوری به پزشک مورد نظر خود را ندارید، به پروفایل پزشک در <a href="/" class="text-primary">پذیرش۲۴</a> سری بزنید و در صورت فعال بودن خدمات ویزیت آنلاین ایشان، نوبت ویزیت آنلاین خود را دریافت کنید؛ در غیر این‌صورت می‌توانید از سایر پزشکان ${doctorExpertise ?? 'سایر'
-          } <a href="/consult" class="text-primary"> ویزیت آنلاین (تلفنی و متنی)</a> نوبت بگیرید.</p>
-        <p>در صورت نیاز به عکس و بیوگرافی و <b>آدرس اینستاگرام ${information.display_name
-          }</b>، کانال تلگرام و وبسایت ایشان، اطلاعات موجود در پروفایل ایشان را مشاهده نمایید.</p>
-        <ui>
-        <li>آدرس مطب ${information.display_name}: ${isOnlineVisitCenter || (!center?.address && !center?.city) ? 'ثبت نشده' : `${center?.city}، ${center?.address}`
-          }</li>
-        <li>تلفن مطب ${information.display_name}: <span class="inline-block">${isOnlineVisitCenter || !center?.display_number_array[0] ? 'ثبت نشده' : center?.display_number_array[0] ?? ''
-          }</span></li>
-        <li>تخصص ${information.display_name}: ${expertises?.expertises?.map?.((item: any) => item?.alias_title)?.join('/ ') ?? expertises?.expertises?.[0]?.name
-          }</li>
-        </ui>
-        `;
+        const countOfPageView = convertLongToCompactNumber(history?.count_of_page_view);
+        const seoSectionData = getProfileSeoSectionData({
+          information,
+          centers,
+          expertises,
+          feedbacks,
+          history,
+          similarLinks,
+          seo,
+          countOfPageView,
+        });
 
         return {
-          similarLinks: similarLinks?.map((item: any) => ({ name: item.caption, url: item.link })),
-          about,
-          breadcrumbs: seo.breadcrumbs,
+          similarLinks: seoSectionData.similarLinks,
+          about: seoSectionData.about,
+          breadcrumbs: seoSectionData.breadcrumbs,
         };
       },
-      children: (props: any) => {
-        const center = centers?.find?.((item: any) => item?.center_type === 1) ?? centers?.[0];
-        const isOnlineVisitCenter = center?.id === CENTERS.CONSULT;
-        const doctorExpertise = `${expertises?.expertises?.[0]?.degree_name ?? ''} ${expertises?.expertises?.[0]?.expertise_name ?? ''}`;
+      children: () => {
+        const countOfPageView = convertLongToCompactNumber(history?.count_of_page_view);
+        const seoSectionData = getProfileSeoSectionData({
+          information,
+          centers,
+          expertises,
+          feedbacks,
+          history,
+          similarLinks,
+          seo,
+          countOfPageView,
+        });
 
         return (
           <Fragment2
@@ -298,13 +283,14 @@ export const sections = (data: any) => {
             args={{
               information,
               feedbacks,
-              center,
-              isOnlineVisitCenter,
-              doctorExpertise,
-              countOfPageView: convertLongToCompactNumber(history?.count_of_page_view),
+              center: seoSectionData.center,
+              isOnlineVisitCenter: seoSectionData.isOnlineVisitCenter,
+              doctorExpertise: seoSectionData.doctorExpertise,
+              countOfPageView,
               bredcrumbs: seo.breadcrumbs,
               similarLinks,
               expertises,
+              about: seoSectionData.about,
             }}
           />
         );
