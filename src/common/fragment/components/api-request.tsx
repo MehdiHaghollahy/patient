@@ -121,17 +121,15 @@ export const ApiRequest = forwardRef((props: ApiRequestType, ref): any => {
     });
   };
 
-  if (isInitialLoading || isLoading || previewLoadingDisplay) {
+  if ((isInitialLoading || isLoading || previewLoadingDisplay) && loadingDisplay != null) {
     return loadingDisplay;
   }
 
-  if (isError || previewErrorDisplay) {
+  if ((isError || previewErrorDisplay) && errorDisplay != null) {
     return errorDisplay;
   }
 
-  if (data?.data) {
-    return children;
-  }
+  return children;
 });
 
 export const apiRequestMeta: CodeComponentMeta<ApiRequestType> = {

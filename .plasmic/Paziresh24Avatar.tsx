@@ -6,6 +6,7 @@ import {
   DefaultPaziresh24AvatarProps
 } from "./plasmic/paziresh_24_design_system/PlasmicPaziresh24Avatar";
 import { HTMLElementRefOf } from "@plasmicapp/react-web";
+import { PIC_USER_IMAGE_FALLBACK_URL } from "@/common/utils/picUserImageUrl";
 
 // Your component props start with props for variants and slots you defined
 // in Plasmic, but you can add more here, like event handlers that you can
@@ -26,22 +27,31 @@ function Paziresh24Avatar_(
   props: Paziresh24AvatarProps,
   ref: HTMLElementRefOf<"div">
 ) {
-  // Use PlasmicPaziresh24Avatar to render this component as it was
-  // designed in Plasmic, by activating the appropriate variants,
-  // attaching the appropriate event handlers, etc.  You
-  // can also install whatever React hooks you need here to manage state or
-  // fetch data.
-  //
-  // Props you can pass into PlasmicPaziresh24Avatar are:
-  // 1. Variants you want to activate,
-  // 2. Contents for slots you want to fill,
-  // 3. Overrides for any named node in the component to attach behavior and data,
-  // 4. Props to set on the root node.
-  //
-  // By default, we are just piping all Paziresh24AvatarProps here, but feel free
-  // to do whatever works for you.
+  const [src, setSrc] = React.useState(props.src);
+  const [usedFallback, setUsedFallback] = React.useState(false);
 
-  return <PlasmicPaziresh24Avatar root={{ ref }} {...props} />;
+  React.useEffect(() => {
+    setSrc(props.src);
+    setUsedFallback(false);
+  }, [props.src]);
+
+  const handleImageError = () => {
+    if (!usedFallback && src !== PIC_USER_IMAGE_FALLBACK_URL) {
+      setUsedFallback(true);
+      setSrc(PIC_USER_IMAGE_FALLBACK_URL);
+      return;
+    }
+    setSrc(undefined);
+  };
+
+  return (
+    <PlasmicPaziresh24Avatar
+      root={{ ref }}
+      {...props}
+      src={src}
+      img={{ onError: handleImageError }}
+    />
+  );
 }
 
 const Paziresh24Avatar = React.forwardRef(Paziresh24Avatar_);
