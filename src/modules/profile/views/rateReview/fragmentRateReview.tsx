@@ -3,8 +3,10 @@ import { Fragment2 } from '@/common/fragment/fragment2';
 import { enrichReviewResponseWithRelativeTime } from '@/common/utils/formatRelativeFeedbackTime';
 import { newApiFeatureFlaggingCondition } from '@/common/helper/newApiFeatureFlaggingCondition';
 import { useUserInfoStore } from '@/modules/login/store/userInfo';
+import { RaviWidget } from '@/modules/rate-and-review';
+import { useNewRaviWithAi } from '@/modules/rate-and-review/composables/useNewRaviWithAi';
 import { useFeatureIsOn, useFeatureValue } from '@growthbook/growthbook-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import DoctorTags from './doctorTags';
 import RaviGlobalContextsProvider from '../../../../../.plasmic/plasmic/ravi_r_r/PlasmicGlobalContextsProvider';
 import PlasmicReviewRateAndReviews from '.plasmic/plasmic/ravi_r_r/PlasmicReviewRateAndReviews';
@@ -22,6 +24,7 @@ export const FragmentRateReview = ({ profileData }: { profileData: any }) => {
   const [page, setPage] = useState(1);
   const listOfShowDoctorTags = useFeatureValue('profile:doctor-tags|enabled', { slugs: [] });
   const shouldShowDoctorTags = newApiFeatureFlaggingCondition(listOfShowDoctorTags?.slugs, profileData.seo.slug);
+  const showNewRaviWithAi = useNewRaviWithAi();
   const dontShowRateDetails = useFeatureIsOn('ravi_show_external_rate');
   const newProgressList = useFeatureIsOn('ravi_show_new_progress_list');
   const newRateAndCommentCount = useFeatureIsOn('ravi_show_new_rate_count');
@@ -99,6 +102,37 @@ export const FragmentRateReview = ({ profileData }: { profileData: any }) => {
       value: profileData?.feedbacks?.details?.average_rates?.average_quality_of_treatment,
     },
   ];
+
+  const centers = useMemo(
+    () =>
+      (profileData?.centers ?? [])
+        .filter((center: { id?: unknown; name?: string }) => center?.id && center?.name)
+        .map((center: { id: unknown; name: string }) => ({
+          id: String(center.id),
+          name: center.name,
+        })),
+    [profileData?.centers],
+  );
+
+  if (showNewRaviWithAi.isEnabled) {
+    return (
+      <div className="flex flex-col space-y-1">
+        {shouldShowDoctorTags ? (
+          <DoctorTags
+            symptomes={profileData?.symptomes?.slice?.(0, 5) ?? []}
+            doctorId={profileData?.information?.id}
+            serverId={profileData?.information?.server_id}
+          />
+        ) : null}
+        <RaviWidget
+          doctorSlug={profileData.seo.slug}
+          displayName={profileData?.information?.display_name}
+          centers={centers}
+          hideSummary={dontShowRateDetails}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col space-y-1">
