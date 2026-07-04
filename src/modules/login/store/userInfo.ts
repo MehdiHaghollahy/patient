@@ -85,7 +85,6 @@ export const useUserInfoStore = create<UseUserInfoStore>((set, get) => ({
       growthbook.setAttributes({
         ...growthbook.getAttributes(),
         user_id: infoCopy.id != null && infoCopy.id !== '' ? String(infoCopy.id) : undefined,
-        userId: infoCopy.id != null && infoCopy.id !== '' ? String(infoCopy.id) : undefined,
         loggedIn: true,
         is_doctor: infoCopy.provider?.job_title === 'doctor',
       });
@@ -133,7 +132,6 @@ export const useUserInfoStore = create<UseUserInfoStore>((set, get) => ({
     growthbook.setAttributes({
       ...growthbook.getAttributes(),
       user_id: undefined,
-      userId: undefined,
       loggedIn: false,
       is_doctor: false,
     });

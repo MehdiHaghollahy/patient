@@ -32,7 +32,11 @@ export const RaviWidget = ({ doctorSlug, displayName, centers = [], hideSummary 
       {!hideSummary ? (
         summaryQuery.isLoading ? (
           <Skeleton w="100%" h="12rem" rounded="lg" />
-        ) : summaryQuery.isError ? null : (
+        ) : summaryQuery.isError ? (
+          <p className="rounded-lg border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            بارگذاری امتیاز و خلاصه نظرات با خطا مواجه شد.
+          </p>
+        ) : (
           <RaviSummary displayName={displayName} summary={summary} />
         )
       ) : null}

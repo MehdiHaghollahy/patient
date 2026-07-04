@@ -3,26 +3,42 @@ import { RaviReview } from '../types';
 import { useReviewerName } from '../composables/useReviewerName';
 import { highlightText } from '../utils/highlightText';
 import { toFixedRating } from '../utils/rating';
+import { RaviReviewOptions } from './RaviReviewOptions';
 import { RaviUsefulRating } from './RaviUsefulRating';
+import toast from 'react-hot-toast';
 
 interface RaviCardProps {
   review: RaviReview;
+  doctorSlug?: string;
   highlightQuery?: string;
+  onDeleted?: () => void;
+  onEdited?: (description: string) => void;
 }
 
-export const RaviCard = ({ review, highlightQuery = '' }: RaviCardProps) => {
+export const RaviCard = ({
+  review,
+  doctorSlug,
+  highlightQuery = '',
+  onDeleted,
+  onEdited,
+}: RaviCardProps) => {
   const { data: fetchedName, isLoading: isNameLoading } = useReviewerName(
     review.userName ? undefined : review.userId,
   );
   const displayName = review.userName ?? fetchedName ?? (isNameLoading ? '...' : 'بیمار');
 
-  const share = () => {
+  const share = async () => {
     if (typeof navigator === 'undefined') return;
     const url = `${window.location.href.split('#')[0]}#comment-${review.id}`;
     if (navigator.share) {
       navigator.share({ text: 'اشتراک‌گذاری نظر', url }).catch(() => undefined);
-    } else {
-      navigator.clipboard?.writeText(url);
+      return;
+    }
+    try {
+      await navigator.clipboard?.writeText(url);
+      toast.success('لینک نظر کپی شد.');
+    } catch {
+      toast.error('کپی لینک ناموفق بود.');
     }
   };
 
@@ -57,11 +73,21 @@ export const RaviCard = ({ review, highlightQuery = '' }: RaviCardProps) => {
           </div>
         </div>
 
-        {review.rate != null ? (
-          <div className="flex h-[35px] min-w-[35px] shrink-0 items-center justify-center rounded-md bg-blue-600 px-1.5 text-white">
-            <span className="text-sm font-bold leading-none">{toFixedRating(review.rate)}</span>
-          </div>
-        ) : null}
+        <div className="flex shrink-0 items-start gap-1">
+          {review.rate != null ? (
+            <div className="flex h-[35px] min-w-[35px] shrink-0 items-center justify-center rounded-md bg-blue-600 px-1.5 text-white">
+              <span className="text-sm font-bold leading-none">{toFixedRating(review.rate)}</span>
+            </div>
+          ) : null}
+          <RaviReviewOptions
+            feedbackId={review.id}
+            reviewUserId={review.userId}
+            commentText={review.description}
+            doctorSlug={doctorSlug}
+            onDeleted={onDeleted}
+            onEdited={onEdited}
+          />
+        </div>
       </div>
 
       <p className="mt-3 text-justify text-sm leading-7 text-slate-700">

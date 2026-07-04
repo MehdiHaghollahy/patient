@@ -1,8 +1,8 @@
-import { apiGatewayClient } from '@/common/apis/client';
+import { apiGatewayClient, raviApisClient } from '@/common/apis/client';
 import { enrichReviewResponseWithRelativeTime } from '@/common/utils/formatRelativeFeedbackTime';
 import { RaviRateSummary, RaviReviewPage, RaviReviewQuery } from './types';
+
 const PAGE_SIZE = 10;
-const RAVI_APIS_BASE_URL = 'https://ravi-apis.paziresh24.com';
 
 interface RaviFeedbacksResponse {
   data?: Array<Record<string, unknown>>;
@@ -18,8 +18,8 @@ interface RaviFeedbacksResponse {
 }
 
 export const fetchRateSummary = async (doctorSlug: string): Promise<RaviRateSummary> => {
-  const { data } = await apiGatewayClient.get<Record<string, unknown>>(
-    `${RAVI_APIS_BASE_URL}/ravi/v1/rate/doctor/${encodeURIComponent(doctorSlug)}`,
+  const { data } = await raviApisClient.get<Record<string, unknown>>(
+    `/ravi/v1/rate/doctor/${encodeURIComponent(doctorSlug)}`,
     { timeout: 12_000 },
   );
 
@@ -34,9 +34,10 @@ export const fetchRateSummary = async (doctorSlug: string): Promise<RaviRateSumm
   };
 };
 
+/** GET /ravi/v1/feedbacks/doctors/{slug} — feedbacks webservice (filter: default | newest | negative). */
 export const fetchReviewPage = async (doctorSlug: string, query: RaviReviewQuery): Promise<RaviReviewPage> => {
-  const { data } = await apiGatewayClient.get<RaviFeedbacksResponse>(
-    `${RAVI_APIS_BASE_URL}/ravi/v1/feedbacks/doctors/${encodeURIComponent(doctorSlug)}`,
+  const { data } = await raviApisClient.get<RaviFeedbacksResponse>(
+    `/ravi/v1/feedbacks/doctors/${encodeURIComponent(doctorSlug)}`,
     {
       params: {
         filter: query.filter,
@@ -78,8 +79,40 @@ export const submitLikeRate = async ({
   rate: number;
   userId: string;
 }) =>
-  apiGatewayClient.post(
-    `${RAVI_APIS_BASE_URL}/ravi/v1/like_rate`,
+  raviApisClient.post(
+    '/ravi/v1/like_rate',
     { feedback_id: feedbackId, rate, user_id: userId },
     { withCredentials: true },
   );
+
+export const editFeedback = async ({ feedbackId, description }: { feedbackId: string; description: string }) =>
+  raviApisClient.patch(`/ravi/v2/feedbacks?id=${encodeURIComponent(feedbackId)}`, { description }, { withCredentials: true });
+
+export const deleteFeedback = async (feedbackId: string) =>
+  raviApisClient.delete(`/ravi/v1/feedbacks/${encodeURIComponent(feedbackId)}`, { withCredentials: true });
+
+export const reportFeedback = async ({
+  feedbackId,
+  reportText,
+  commentText,
+  doctorSlug,
+}: {
+  feedbackId: string;
+  reportText: string;
+  commentText?: string;
+  doctorSlug?: string;
+}) => {
+  const res = await raviApisClient.post(
+    `/ravi/v1/feedbacks/report?id=${encodeURIComponent(feedbackId)}`,
+    { feedback_id: feedbackId, report_text: reportText },
+    { withCredentials: true },
+  );
+  raviApisClient
+    .post(
+      `/ravi/v1/report-webhook?id=${encodeURIComponent(feedbackId)}`,
+      { feedback_id: feedbackId, report_text: reportText, comment_text: commentText, doctor_slug: doctorSlug },
+      { withCredentials: true },
+    )
+    .catch(() => undefined);
+  return res;
+};

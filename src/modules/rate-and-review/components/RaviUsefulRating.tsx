@@ -3,6 +3,7 @@ import { useLoginModalContext } from '@/modules/login/context/loginModal';
 import { useUserInfoStore } from '@/modules/login/store/userInfo';
 import * as Popover from '@radix-ui/react-popover';
 import { useCallback, useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { submitLikeRate } from '../api';
 import { getUserLikeRate, saveLikedComment } from '../utils/likedComments';
 import { RaviRateStar } from './RaviRateStar';
@@ -65,6 +66,8 @@ export const RaviUsefulRating = ({ feedbackId, likeCount }: RaviUsefulRatingProp
           setRate(value);
           setOpen(false);
         }
+      } catch {
+        toast.error('ثبت امتیاز مفید بودن ناموفق بود. دوباره تلاش کنید.');
       } finally {
         setIsSubmitting(false);
       }

@@ -83,8 +83,24 @@ export const useRaviReviews = (doctorSlug: string, userId?: string) => {
     [doctorSlug, toQuery],
   );
 
+  const applyDebouncedSearch = useMemo(
+    () =>
+      debounce((value: string) => {
+        setDebouncedSearch(value);
+        setIsSearchPending(false);
+      }, 250),
+    [],
+  );
+
+  useEffect(() => () => applyDebouncedSearch.cancel(), [applyDebouncedSearch]);
+
   useEffect(() => {
     if (!doctorSlug) return;
+
+    applyDebouncedSearch.cancel();
+    setSearch('');
+    setDebouncedSearch('');
+    setIsSearchPending(false);
 
     const cached = stateBySlugRef.current[doctorSlug];
     if (cached) {
@@ -98,18 +114,7 @@ export const useRaviReviews = (doctorSlug: string, userId?: string) => {
     }
 
     run(1, 'default_order', INITIAL_FILTER, false);
-  }, [doctorSlug, run]);
-
-  const applyDebouncedSearch = useMemo(
-    () =>
-      debounce((value: string) => {
-        setDebouncedSearch(value);
-        setIsSearchPending(false);
-      }, 250),
-    [],
-  );
-
-  useEffect(() => () => applyDebouncedSearch.cancel(), [applyDebouncedSearch]);
+  }, [doctorSlug, run, applyDebouncedSearch]);
 
   const loadMore = useCallback(() => {
     if (!hasMore || isLoading) return;
@@ -145,6 +150,43 @@ export const useRaviReviews = (doctorSlug: string, userId?: string) => {
     [applyDebouncedSearch, run, sort],
   );
 
+  const syncList = useCallback(
+    (
+      updater:
+        | RaviReviewPage['list']
+        | ((previous: RaviReviewPage['list']) => RaviReviewPage['list']),
+    ) => {
+      setList(previous => {
+        const nextList = typeof updater === 'function' ? updater(previous) : updater;
+        const cached = stateBySlugRef.current[doctorSlug];
+        if (cached) {
+          stateBySlugRef.current[doctorSlug] = { ...cached, list: nextList };
+        }
+        return nextList;
+      });
+    },
+    [doctorSlug],
+  );
+
+  const removeReview = useCallback(
+    (reviewId: string) => {
+      syncList(previous => previous.filter(item => String(item.id ?? item.Id ?? '') !== reviewId));
+    },
+    [syncList],
+  );
+
+  const updateReviewDescription = useCallback(
+    (reviewId: string, description: string) => {
+      syncList(previous =>
+        previous.map(item => {
+          const id = String(item.id ?? item.Id ?? '');
+          return id === reviewId ? { ...item, description } : item;
+        }),
+      );
+    },
+    [syncList],
+  );
+
   return {
     list,
     hasMore,
@@ -160,5 +202,7 @@ export const useRaviReviews = (doctorSlug: string, userId?: string) => {
     onSearch,
     onSort,
     onFilter,
+    removeReview,
+    updateReviewDescription,
   };
 };

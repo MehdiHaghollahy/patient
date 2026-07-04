@@ -1,4 +1,5 @@
 export type RaviSort = 'default_order' | 'created_at';
+/** `negative` returns reviews with avg rating between 3.5 and 4 (per feedbacks API). */
 export type RaviFeedbackFilter = 'default' | 'newest' | 'negative';
 export type RaviFilter = 'all' | 'my_feedbacks' | 'not_recommended' | 'center_id';
 

@@ -24,7 +24,6 @@ export const useNewRaviWithAi = () => {
     growthbook.setAttributes({
       ...growthbook.getAttributes(),
       user_id: normalizedUserId,
-      userId: normalizedUserId,
       loggedIn: true,
     });
     void growthbook.refreshFeatures({ skipCache: true });

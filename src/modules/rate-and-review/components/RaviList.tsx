@@ -28,6 +28,8 @@ export const RaviList = ({ doctorSlug, userId, centers = [] }: RaviListProps) =>
     onFilter,
     error,
     page,
+    removeReview,
+    updateReviewDescription,
   } = useRaviReviews(doctorSlug, userId);
 
   const reviews = useMemo(() => list.map(mapRawReviewToRaviReview), [list]);
@@ -35,17 +37,16 @@ export const RaviList = ({ doctorSlug, userId, centers = [] }: RaviListProps) =>
     () => filterReviewsBySearch(reviews, debouncedSearch),
     [debouncedSearch, reviews],
   );
-  const showLoading = (isLoading && !reviews.length) || isSearchPending;
+  const showInitialLoading = isLoading && !reviews.length;
+  const showSearchLoading = isSearchPending && !reviews.length;
 
   const selectedFilter = (() => {
     if (filter.type === 'center_id') return filter.value ?? 'all';
-    if (filter.type === 'my_feedbacks') return 'my_feedbacks';
     return filter.type;
   })();
 
   const handleFilter = (value: string) => {
     if (value === 'all') return onFilter({ type: 'all' });
-    if (value === 'my_feedbacks') return onFilter({ type: 'my_feedbacks', value: userId });
     if (value === 'not_recommended') return onFilter({ type: 'not_recommended' });
     onFilter({ type: 'center_id', value });
   };
@@ -57,7 +58,6 @@ export const RaviList = ({ doctorSlug, userId, centers = [] }: RaviListProps) =>
           sort={sort}
           filterValue={selectedFilter}
           search={search}
-          userId={userId}
           centers={centers}
           onSort={onSort}
           onFilter={handleFilter}
@@ -67,26 +67,35 @@ export const RaviList = ({ doctorSlug, userId, centers = [] }: RaviListProps) =>
 
       {error ? <p className="px-4 pb-3 text-sm text-rose-600">{error}</p> : null}
 
-      {showLoading ? (
+      {debouncedSearch && hasMore ? (
+        <p className="px-4 pb-2 text-xs text-slate-500">جستجو فقط در نظرات بارگذاری‌شده انجام می‌شود.</p>
+      ) : null}
+
+      {showInitialLoading || showSearchLoading ? (
         <p className="px-4 pb-4 text-sm text-slate-500">
-          {isSearchPending ? 'در حال جستجو...' : 'در حال بارگذاری نظرات...'}
+          {showSearchLoading ? 'در حال جستجو...' : 'در حال بارگذاری نظرات...'}
         </p>
       ) : null}
 
-      {!showLoading && !reviews.length ? (
+      {!showInitialLoading && !reviews.length ? (
         <p className="px-4 pb-4 text-sm text-slate-500">نظری ثبت نشده است.</p>
       ) : null}
 
-      {!showLoading && reviews.length > 0 && !filteredReviews.length ? (
+      {!showInitialLoading && reviews.length > 0 && !filteredReviews.length ? (
         <p className="px-4 pb-4 text-sm text-slate-500">نتیجه‌ای برای جستجوی شما یافت نشد.</p>
       ) : null}
-      {!showLoading ? (
-        <div>
-          {filteredReviews.map(review => (
-            <RaviCard key={review.id} review={review} highlightQuery={debouncedSearch} />
-          ))}
-        </div>
-      ) : null}
+      <div>
+        {filteredReviews.map(review => (
+          <RaviCard
+            key={review.id}
+            review={review}
+            doctorSlug={doctorSlug}
+            highlightQuery={debouncedSearch}
+            onDeleted={() => removeReview(review.id)}
+            onEdited={description => updateReviewDescription(review.id, description)}
+          />
+        ))}
+      </div>
 
       {hasMore ? (
         <div className="p-4">

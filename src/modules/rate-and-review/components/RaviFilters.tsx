@@ -7,7 +7,6 @@ interface RaviFiltersProps {
   sort: RaviSort;
   filterValue: string;
   search: string;
-  userId?: string;
   centers?: RaviCenter[];
   onSort: (value: RaviSort) => void;
   onFilter: (value: string) => void;
@@ -21,7 +20,6 @@ export const RaviFilters = ({
   sort,
   filterValue,
   search,
-  userId,
   centers = [],
   onSort,
   onFilter,
@@ -38,11 +36,10 @@ export const RaviFilters = ({
   const filterOptions = useMemo(
     () => [
       { value: 'all', label: 'همه نظرات' },
-      ...(userId ? [{ value: 'my_feedbacks', label: 'نظرات من' }] : []),
       { value: 'not_recommended', label: 'نظرات منفی' },
       ...centers.map(center => ({ value: center.id, label: center.name })),
     ],
-    [centers, userId],
+    [centers],
   );
 
   return (

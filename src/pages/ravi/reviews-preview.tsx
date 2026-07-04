@@ -53,11 +53,12 @@ export default function RaviReviewsPreviewPage() {
 
         {isReady && !showNewRaviWithAi ? (
           <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            این پیش‌نمایش فقط برای کاربرانی که در فیچر فلگ <code>new-ravi-with-ai</code> فعال هستند در دسترس است.
+            در پروفایل واقعی، این بخش فقط برای کاربرانی که فیچر فلگ <code>new-ravi-with-ai</code> فعال است
+            نمایش داده می‌شود. در این صفحه پیش‌نمایش، ویجت بدون توجه به فلگ بارگذاری می‌شود.
           </p>
         ) : null}
 
-        {showNewRaviWithAi && activeSlug ? <RaviWidget doctorSlug={activeSlug} /> : null}
+        {activeSlug ? <RaviWidget doctorSlug={activeSlug} /> : null}
       </div>
     </LayoutWithHeaderAndFooter>
   );

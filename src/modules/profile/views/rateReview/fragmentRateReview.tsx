@@ -39,10 +39,12 @@ export const FragmentRateReview = ({ profileData }: { profileData: any }) => {
     },
     {
       refetchOnMount: false,
+      enabled: !showNewRaviWithAi.isEnabled,
     },
   );
 
   useEffect(() => {
+    if (showNewRaviWithAi.isEnabled) return;
     if (getFeedbacks.data) {
       setPageInfo(getFeedbacks.data?.pageInfo);
       const list = enrichReviewResponseWithRelativeTime(getFeedbacks.data.list);
