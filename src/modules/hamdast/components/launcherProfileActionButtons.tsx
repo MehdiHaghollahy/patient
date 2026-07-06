@@ -32,6 +32,7 @@ type LauncherProfileActionButtonsProps = {
   isLoading?: boolean;
   onLoadingChange?: (loading: boolean) => void;
   onMainClick?: () => void | Promise<void>;
+  forceOutline?: boolean;
   className?: string;
 };
 
@@ -43,6 +44,7 @@ export function LauncherProfileActionButtons({
   isLoading = false,
   onLoadingChange,
   onMainClick,
+  forceOutline = false,
   className,
 }: LauncherProfileActionButtonsProps) {
   const isEndpointLoadingRef = useRef(false);
@@ -136,7 +138,7 @@ export function LauncherProfileActionButtons({
       className={buttonClassName}
       isDisabled={Boolean(endpoint && isEndpointButtonLoading)}
       loading={Boolean(endpoint && isEndpointButtonLoading)}
-      outline={isLauncherProfileButtonOutline(widgetInfo, userWidgets, appKey)}
+      outline={forceOutline || isLauncherProfileButtonOutline(widgetInfo, userWidgets, appKey)}
       onClick={() => {
         void handleSingleButtonClick();
       }}
