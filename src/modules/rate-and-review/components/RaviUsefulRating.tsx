@@ -21,6 +21,7 @@ export const RaviUsefulRating = ({ feedbackId, likeCount }: RaviUsefulRatingProp
   const { handleOpenLoginModal } = useLoginModalContext();
   const [open, setOpen] = useState(false);
   const [rate, setRate] = useState(0);
+  const [hoverStar, setHoverStar] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submitInFlightRef = useRef(false);
 
@@ -41,6 +42,9 @@ export const RaviUsefulRating = ({ feedbackId, likeCount }: RaviUsefulRatingProp
       if (nextOpen && !isLogin) {
         requireLogin();
         return;
+      }
+      if (!nextOpen) {
+        setHoverStar(0);
       }
       setOpen(nextOpen);
     },
@@ -110,18 +114,25 @@ export const RaviUsefulRating = ({ feedbackId, likeCount }: RaviUsefulRatingProp
           collisionPadding={8}
           className="z-50 flex flex-row items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-[0_4px_16px_0_rgba(0,0,0,0.2)] outline-none"
           dir="ltr"
+          onMouseLeave={() => setHoverStar(0)}
         >
-          {[1, 2, 3, 4, 5].map(star => (
-            <button
-              key={star}
-              type="button"
-              disabled={isSubmitting}
-              className="inline-flex items-center justify-center disabled:opacity-60"
-              onClick={() => handleRate(star)}
-            >
-              <RaviRateStar selected={star <= rate} />
-            </button>
-          ))}
+          {[1, 2, 3, 4, 5].map(star => {
+            const activeStar = hoverStar || rate;
+
+            return (
+              <button
+                key={star}
+                type="button"
+                disabled={isSubmitting}
+                aria-label={`${star} از ۵ ستاره`}
+                className="inline-flex cursor-pointer items-center justify-center disabled:cursor-not-allowed disabled:opacity-60"
+                onMouseEnter={() => setHoverStar(star)}
+                onClick={() => handleRate(star)}
+              >
+                <RaviRateStar selected={star <= activeStar} />
+              </button>
+            );
+          })}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

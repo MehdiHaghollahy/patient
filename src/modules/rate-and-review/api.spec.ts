@@ -29,6 +29,7 @@ const mockedPatch = raviApisClient.patch as jest.Mock;
 const mockedDelete = raviApisClient.delete as jest.Mock;
 
 const mockedGatewayGet = apiGatewayClient.get as jest.Mock;
+const mockedGatewayPost = apiGatewayClient.post as jest.Mock;
 
 describe('rate-and-review api', () => {
   beforeEach(() => {
@@ -139,29 +140,49 @@ describe('rate-and-review api', () => {
     expect(mockedDelete).toHaveBeenCalledWith('/ravi/v1/feedbacks/fb-2', { withCredentials: true });
   });
 
-  it('reportFeedback posts report and webhook', async () => {
-    mockedPost.mockResolvedValue({ data: { ok: true } });
+  it('reportFeedback posts to ravi v3 report endpoint', async () => {
+    mockedGatewayPost.mockResolvedValueOnce({ data: { ok: true } });
     await reportFeedback({
       feedbackId: 'fb-3',
-      reportText: 'غیرواقعی',
-      commentText: 'spam',
-      doctorSlug: 'dr-test',
+      slug: 'dr-test',
+      feedbackDescription: 'متن نظر',
+      reportDescription: 'توضیح بیشتر',
+      reportReason: 'موارد دیگر',
+      userId: '2123019',
     });
 
-    expect(mockedPost).toHaveBeenNthCalledWith(
-      1,
-      '/ravi/v1/feedbacks/report?id=fb-3',
-      { feedback_id: 'fb-3', report_text: 'غیرواقعی' },
+    expect(mockedGatewayPost).toHaveBeenCalledWith(
+      '/ravi/v3/report',
+      {
+        user_id: '2123019',
+        slug: 'dr-test',
+        feedback_id: 'fb-3',
+        feedback_description: 'متن نظر',
+        report_description: 'توضیح بیشتر',
+        report_reason: 'موارد دیگر',
+      },
       { withCredentials: true },
     );
-    expect(mockedPost).toHaveBeenNthCalledWith(
-      2,
-      '/ravi/v1/report-webhook?id=fb-3',
+  });
+
+  it('reportFeedback omits user_id when user is not logged in', async () => {
+    mockedGatewayPost.mockResolvedValueOnce({ data: { ok: true } });
+    await reportFeedback({
+      feedbackId: 'fb-4',
+      slug: 'dr-test',
+      feedbackDescription: 'متن نظر',
+      reportDescription: '',
+      reportReason: 'غیرواقعی',
+    });
+
+    expect(mockedGatewayPost).toHaveBeenCalledWith(
+      '/ravi/v3/report',
       {
-        feedback_id: 'fb-3',
-        report_text: 'غیرواقعی',
-        comment_text: 'spam',
-        doctor_slug: 'dr-test',
+        slug: 'dr-test',
+        feedback_id: 'fb-4',
+        feedback_description: 'متن نظر',
+        report_description: '',
+        report_reason: 'غیرواقعی',
       },
       { withCredentials: true },
     );

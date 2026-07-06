@@ -68,7 +68,6 @@ export const RaviReviewOptions = ({
     String(currentUserId) === String(reviewUserId);
 
   const isOtherReport = reportReason === 'موارد دیگر';
-  const reportText = isOtherReport ? reportOtherText.trim() : reportReason;
 
   useEffect(() => {
     setEditText(commentText);
@@ -143,6 +142,11 @@ export const RaviReviewOptions = ({
   };
 
   const handleReport = async () => {
+    if (!doctorSlug) {
+      toast.error('slug پزشک مشخص نیست.');
+      return;
+    }
+
     if (isOtherReport && reportOtherText.trim().length < 10) {
       toast.error('حداقل مقدار مجاز ۱۰ کاراکتر می باشد.');
       return;
@@ -150,7 +154,14 @@ export const RaviReviewOptions = ({
 
     setIsSubmitting(true);
     try {
-      await reportFeedback({ feedbackId, reportText, commentText, doctorSlug });
+      await reportFeedback({
+        feedbackId,
+        slug: doctorSlug,
+        feedbackDescription: commentText,
+        reportDescription: isOtherReport ? reportOtherText.trim() : '',
+        reportReason,
+        userId: currentUserId != null ? String(currentUserId) : undefined,
+      });
       reportModal.handleClose();
       toast.success('گزارش شما ثبت شد.');
     } catch {
