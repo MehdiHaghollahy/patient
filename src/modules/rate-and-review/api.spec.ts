@@ -1,8 +1,16 @@
-import { raviApisClient } from '@/common/apis/client';
-import { deleteFeedback, editFeedback, fetchRateSummary, fetchReviewPage, reportFeedback } from './api';
+import { apiGatewayClient, raviApisClient } from '@/common/apis/client';
+import {
+  deleteFeedback,
+  editFeedback,
+  fetchFeedbackReply,
+  fetchRateSummary,
+  fetchReviewPage,
+  reportFeedback,
+  submitLikeRate,
+} from './api';
 
 jest.mock('@/common/apis/client', () => ({
-  apiGatewayClient: { get: jest.fn() },
+  apiGatewayClient: { get: jest.fn(), post: jest.fn() },
   raviApisClient: {
     get: jest.fn(),
     post: jest.fn(),
@@ -19,6 +27,8 @@ const mockedGet = raviApisClient.get as jest.Mock;
 const mockedPost = raviApisClient.post as jest.Mock;
 const mockedPatch = raviApisClient.patch as jest.Mock;
 const mockedDelete = raviApisClient.delete as jest.Mock;
+
+const mockedGatewayGet = apiGatewayClient.get as jest.Mock;
 
 describe('rate-and-review api', () => {
   beforeEach(() => {
@@ -49,6 +59,32 @@ describe('rate-and-review api', () => {
     expect(mockedGet).toHaveBeenCalledWith('/ravi/v1/rate/doctor/dr-test', { timeout: 12_000 });
   });
 
+  it('fetchRateSummary maps hide field when hide_rates is absent', async () => {
+    mockedGet.mockResolvedValueOnce({
+      data: {
+        hide: 1,
+        comments_count: 3,
+        doctor_encounter: 4,
+        explanation_of_issue: 4,
+        quality_of_treatment: 4,
+      },
+    });
+
+    await expect(fetchRateSummary('dr-hide')).resolves.toMatchObject({
+      hideRates: true,
+      count: 3,
+    });
+  });
+
+  it('fetchRateSummary returns null when doctor rate summary is not found', async () => {
+    mockedGet.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { data: { error: { code: 'RATE_NOT_FOUND', message: 'doctor rate summary not found' } } },
+    });
+
+    await expect(fetchRateSummary('dr-missing')).resolves.toBeNull();
+  });
+
   it('fetchReviewPage requests feedbacks with filter params', async () => {
     mockedGet.mockResolvedValueOnce({
       data: {
@@ -75,6 +111,16 @@ describe('rate-and-review api', () => {
     });
     expect(page.list).toHaveLength(1);
     expect(page.hasMore).toBe(false);
+  });
+
+  it('submitLikeRate posts to ravi-apis feedbacks likes endpoint', async () => {
+    mockedPost.mockResolvedValueOnce({ status: 200, data: {} });
+    await submitLikeRate({ feedbackId: 'fb-like', rate: 3, userId: '2123019' });
+    expect(mockedPost).toHaveBeenCalledWith(
+      '/ravi/v1/feedbacks/fb-like/likes',
+      { rate: 3, user_id: '2123019' },
+      { withCredentials: true },
+    );
   });
 
   it('editFeedback patches description', async () => {
@@ -119,5 +165,34 @@ describe('rate-and-review api', () => {
       },
       { withCredentials: true },
     );
+  });
+
+  it('fetchFeedbackReply requests ravi_get_reply with plasmic where filters', async () => {
+    mockedGatewayGet.mockResolvedValueOnce({
+      data: {
+        list: [{ Id: 'reply-1', description: 'پاسخ پزشک', user_id: 'doc-9' }],
+      },
+    });
+
+    await expect(fetchFeedbackReply('dr-test', 'fb-10')).resolves.toEqual({
+      id: 'reply-1',
+      description: 'پاسخ پزشک',
+      userId: 'doc-9',
+    });
+
+    expect(mockedGatewayGet).toHaveBeenCalledWith('/ravi/v1/ravi_get_reply', {
+      params: {
+        where:
+          '(doctor_slug,eq,dr-test)~and(reply_to_feedback_id,eq,fb-10)~and(show,eq,1)~and(delete,eq,0)~and(description,isnot,null)',
+        limit: 1,
+        offset: 0,
+        sort: '-created_at',
+      },
+    });
+  });
+
+  it('fetchFeedbackReply returns null when reply has no description', async () => {
+    mockedGatewayGet.mockResolvedValueOnce({ data: { list: [{ Id: 'reply-2' }] } });
+    await expect(fetchFeedbackReply('dr-test', 'fb-11')).resolves.toBeNull();
   });
 });

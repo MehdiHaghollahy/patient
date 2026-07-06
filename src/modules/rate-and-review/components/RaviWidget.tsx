@@ -8,24 +8,30 @@ import { RaviSummary } from './RaviSummary';
 
 export interface RaviWidgetProps {
   doctorSlug: string;
+  doctorUserId?: string;
   displayName?: string;
   centers?: RaviCenter[];
   hideSummary?: boolean;
 }
 
-export const RaviWidget = ({ doctorSlug, displayName, centers = [], hideSummary = false }: RaviWidgetProps) => {
+export const RaviWidget = ({
+  doctorSlug,
+  doctorUserId,
+  displayName,
+  centers = [],
+  hideSummary = false,
+}: RaviWidgetProps) => {
   const userId = useUserInfoStore(state => state.info?.id?.toString());
 
   const summaryQuery = useQuery(['ravi-rate-summary', doctorSlug], () => fetchRateSummary(doctorSlug), {
     enabled: !!doctorSlug,
     staleTime: 60_000,
   });
+  const hideRates = summaryQuery.data?.hideRates;
 
   if (!doctorSlug) {
     return <p className="text-sm text-slate-500">slug پزشک مشخص نشده است.</p>;
   }
-
-  const summary = summaryQuery.data ?? { count: 0, items: [], hideRates: false };
 
   return (
     <div className="flex flex-col space-y-px" dir="rtl">
@@ -36,11 +42,13 @@ export const RaviWidget = ({ doctorSlug, displayName, centers = [], hideSummary 
           <p className="rounded-lg border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             بارگذاری امتیاز و خلاصه نظرات با خطا مواجه شد.
           </p>
-        ) : (
-          <RaviSummary displayName={displayName} summary={summary} />
-        )
+        ) : summaryQuery.data ? (
+          <RaviSummary displayName={displayName} summary={summaryQuery.data} />
+        ) : null
       ) : null}
-      <RaviList doctorSlug={doctorSlug} userId={userId} centers={centers} />
+      {!hideRates ? (
+        <RaviList doctorSlug={doctorSlug} doctorUserId={doctorUserId} userId={userId} centers={centers} />
+      ) : null}
     </div>
   );
 };

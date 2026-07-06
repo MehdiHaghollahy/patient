@@ -2,7 +2,7 @@ import LikeIcon from '@/common/components/icons/like';
 import { useLoginModalContext } from '@/modules/login/context/loginModal';
 import { useUserInfoStore } from '@/modules/login/store/userInfo';
 import * as Popover from '@radix-ui/react-popover';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { submitLikeRate } from '../api';
 import { getUserLikeRate, saveLikedComment } from '../utils/likedComments';
@@ -22,6 +22,7 @@ export const RaviUsefulRating = ({ feedbackId, likeCount }: RaviUsefulRatingProp
   const [open, setOpen] = useState(false);
   const [rate, setRate] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitInFlightRef = useRef(false);
 
   useEffect(() => {
     if (!isLogin || userId == null) {
@@ -53,6 +54,16 @@ export const RaviUsefulRating = ({ feedbackId, likeCount }: RaviUsefulRatingProp
         return;
       }
 
+      if (value === rate) {
+        setOpen(false);
+        return;
+      }
+
+      if (submitInFlightRef.current) {
+        return;
+      }
+
+      submitInFlightRef.current = true;
       setIsSubmitting(true);
       try {
         const response = await submitLikeRate({
@@ -69,10 +80,11 @@ export const RaviUsefulRating = ({ feedbackId, likeCount }: RaviUsefulRatingProp
       } catch {
         toast.error('ثبت امتیاز مفید بودن ناموفق بود. دوباره تلاش کنید.');
       } finally {
+        submitInFlightRef.current = false;
         setIsSubmitting(false);
       }
     },
-    [feedbackId, isLogin, requireLogin, userId],
+    [feedbackId, isLogin, rate, requireLogin, userId],
   );
 
   return (

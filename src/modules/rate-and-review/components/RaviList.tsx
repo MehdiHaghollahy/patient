@@ -8,11 +8,12 @@ import { RaviCard } from './RaviCard';
 import { RaviFilters } from './RaviFilters';
 interface RaviListProps {
   doctorSlug: string;
+  doctorUserId?: string;
   userId?: string;
   centers?: RaviCenter[];
 }
 
-export const RaviList = ({ doctorSlug, userId, centers = [] }: RaviListProps) => {
+export const RaviList = ({ doctorSlug, doctorUserId, userId, centers = [] }: RaviListProps) => {
   const {
     list,
     isLoading,
@@ -90,6 +91,7 @@ export const RaviList = ({ doctorSlug, userId, centers = [] }: RaviListProps) =>
             key={review.id}
             review={review}
             doctorSlug={doctorSlug}
+            doctorUserId={doctorUserId}
             highlightQuery={debouncedSearch}
             onDeleted={() => removeReview(review.id)}
             onEdited={description => updateReviewDescription(review.id, description)}

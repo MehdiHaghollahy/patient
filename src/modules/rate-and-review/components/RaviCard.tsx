@@ -1,15 +1,18 @@
 import ShareIcon from '@/common/components/icons/share';
 import { RaviReview } from '../types';
+import { useFeedbackReply } from '../composables/useFeedbackReply';
 import { useReviewerName } from '../composables/useReviewerName';
 import { highlightText } from '../utils/highlightText';
 import { toFixedRating } from '../utils/rating';
 import { RaviReviewOptions } from './RaviReviewOptions';
+import { RaviReviewReply } from './RaviReviewReply';
 import { RaviUsefulRating } from './RaviUsefulRating';
 import toast from 'react-hot-toast';
 
 interface RaviCardProps {
   review: RaviReview;
   doctorSlug?: string;
+  doctorUserId?: string;
   highlightQuery?: string;
   onDeleted?: () => void;
   onEdited?: (description: string) => void;
@@ -18,6 +21,7 @@ interface RaviCardProps {
 export const RaviCard = ({
   review,
   doctorSlug,
+  doctorUserId,
   highlightQuery = '',
   onDeleted,
   onEdited,
@@ -25,6 +29,7 @@ export const RaviCard = ({
   const { data: fetchedName, isLoading: isNameLoading } = useReviewerName(
     review.userName ? undefined : review.userId,
   );
+  const { data: reply } = useFeedbackReply(doctorSlug, review.id);
   const displayName = review.userName ?? fetchedName ?? (isNameLoading ? '...' : 'بیمار');
 
   const share = async () => {
@@ -106,6 +111,15 @@ export const RaviCard = ({
 
         <RaviUsefulRating feedbackId={review.id} likeCount={review.likeCount} />
       </div>
+
+      {reply ? (
+        <RaviReviewReply
+          description={reply.description}
+          userId={reply.userId}
+          doctorUserId={doctorUserId}
+          highlightQuery={highlightQuery}
+        />
+      ) : null}
     </article>
   );
 };

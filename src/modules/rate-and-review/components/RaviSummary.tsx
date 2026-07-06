@@ -2,6 +2,7 @@ import { InfoIcon } from '@/common/components/icons/info';
 import { useState } from 'react';
 import { RaviRateSummary } from '../types';
 import { averageFromBreakdown, toFixedRating } from '../utils/rating';
+import { RaviDoctorHideRatesBanner, RaviLowReviewCountBanner } from './RaviSummaryBanners';
 
 const SATISFACTION_HINT =
   'درصد رضایت، حاصل میانگین سه پارامتر «برخورد»، «توضیح» و «مهارت و تخصص» پزشک می‌باشد که همگی توسط بیماران اعلام گردیده‌اند.';
@@ -16,7 +17,17 @@ export const RaviSummary = ({ displayName, summary }: RaviSummaryProps) => {
   const average = averageFromBreakdown(summary.items);
   const totalScore = summary.items.reduce((sum, item) => sum + item.value, 0);
 
-  if (summary.hideRates || totalScore === 0) {
+  if (summary.hideRates) {
+    return (
+      <section className="w-full bg-white md:rounded-lg">
+        <div className="p-4">
+          <RaviDoctorHideRatesBanner />
+        </div>
+      </section>
+    );
+  }
+
+  if (totalScore === 0) {
     return null;
   }
 
@@ -28,9 +39,7 @@ export const RaviSummary = ({ displayName, summary }: RaviSummaryProps) => {
 
       <div className="flex flex-col items-center gap-3 p-4">
         {summary.count < 5 ? (
-          <p className="w-full rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            به دلیل تعداد کم نظرات، امتیاز قابل نمایش نیست.
-          </p>
+          <RaviLowReviewCountBanner />
         ) : (
           <div className="flex flex-row flex-wrap items-center justify-center gap-2" dir="rtl">
             <span className="inline-flex items-center gap-1 rounded-[19px] bg-green-600 px-3 py-1 text-sm font-medium text-white">
