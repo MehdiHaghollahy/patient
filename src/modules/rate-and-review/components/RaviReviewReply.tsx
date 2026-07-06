@@ -21,10 +21,8 @@ export const RaviReviewReply = ({
 
   const displayName = (() => {
     if (isLoading) return '...';
-    if (isDoctor && reviewerInfo?.name) {
-      return [reviewerInfo.name, reviewerInfo.family].filter(Boolean).join(' ');
-    }
-    return reviewerInfo?.name ?? 'کاربر بدون نام';
+    const fullName = [reviewerInfo?.name, reviewerInfo?.family].filter(Boolean).join(' ');
+    return fullName || 'کاربر بدون نام';
   })();
 
   return (

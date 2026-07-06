@@ -140,26 +140,28 @@ export const deleteFeedback = async (feedbackId: string) =>
 
 export const reportFeedback = async ({
   feedbackId,
-  reportText,
-  commentText,
-  doctorSlug,
+  slug,
+  feedbackDescription,
+  reportDescription,
+  reportReason,
+  userId,
 }: {
   feedbackId: string;
-  reportText: string;
-  commentText?: string;
-  doctorSlug?: string;
-}) => {
-  const res = await raviApisClient.post(
-    `/ravi/v1/feedbacks/report?id=${encodeURIComponent(feedbackId)}`,
-    { feedback_id: feedbackId, report_text: reportText },
+  slug: string;
+  feedbackDescription: string;
+  reportDescription: string;
+  reportReason: string;
+  userId?: string;
+}) =>
+  apiGatewayClient.post(
+    '/ravi/v3/report',
+    {
+      ...(userId ? { user_id: userId } : {}),
+      slug,
+      feedback_id: feedbackId,
+      feedback_description: feedbackDescription,
+      report_description: reportDescription,
+      report_reason: reportReason,
+    },
     { withCredentials: true },
   );
-  raviApisClient
-    .post(
-      `/ravi/v1/report-webhook?id=${encodeURIComponent(feedbackId)}`,
-      { feedback_id: feedbackId, report_text: reportText, comment_text: commentText, doctor_slug: doctorSlug },
-      { withCredentials: true },
-    )
-    .catch(() => undefined);
-  return res;
-};
