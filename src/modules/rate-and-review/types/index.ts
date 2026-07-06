@@ -20,6 +20,12 @@ export interface RaviReview {
   likeCount?: number;
 }
 
+export interface RaviFeedbackReply {
+  id: string;
+  description: string;
+  userId?: string;
+}
+
 export interface RaviReviewQuery {
   offset: number;
   limit: number;

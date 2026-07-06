@@ -128,6 +128,7 @@ export const FragmentRateReview = ({ profileData }: { profileData: any }) => {
         ) : null}
         <RaviWidget
           doctorSlug={profileData.seo.slug}
+          doctorUserId={profileData?.information?.id != null ? String(profileData.information.id) : undefined}
           displayName={profileData?.information?.display_name}
           centers={centers}
           hideSummary={dontShowRateDetails}

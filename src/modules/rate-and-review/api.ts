@@ -1,6 +1,10 @@
 import { apiGatewayClient, raviApisClient } from '@/common/apis/client';
 import { enrichReviewResponseWithRelativeTime } from '@/common/utils/formatRelativeFeedbackTime';
-import { RaviRateSummary, RaviReviewPage, RaviReviewQuery } from './types';
+import axios from 'axios';
+import { RaviFeedbackReply, RaviRateSummary, RaviReviewPage, RaviReviewQuery } from './types';
+
+export const isRateSummaryNotFound = (error: unknown): boolean =>
+  axios.isAxiosError(error) && error.response?.data?.error?.code === 'RATE_NOT_FOUND';
 
 const PAGE_SIZE = 10;
 
@@ -17,21 +21,28 @@ interface RaviFeedbacksResponse {
   pageInfo?: RaviReviewPage['pageInfo'];
 }
 
-export const fetchRateSummary = async (doctorSlug: string): Promise<RaviRateSummary> => {
-  const { data } = await raviApisClient.get<Record<string, unknown>>(
-    `/ravi/v1/rate/doctor/${encodeURIComponent(doctorSlug)}`,
-    { timeout: 12_000 },
-  );
+export const fetchRateSummary = async (doctorSlug: string): Promise<RaviRateSummary | null> => {
+  try {
+    const { data } = await raviApisClient.get<Record<string, unknown>>(
+      `/ravi/v1/rate/doctor/${encodeURIComponent(doctorSlug)}`,
+      { timeout: 12_000 },
+    );
 
-  return {
-    hideRates: Boolean(data?.hide_rates),
-    count: Number(data?.comments_count ?? data?.count_rates ?? 0),
-    items: [
-      { label: 'برخورد مناسب', value: Number(data?.doctor_encounter) || 0 },
-      { label: 'توضیح در هنگام ویزیت', value: Number(data?.explanation_of_issue) || 0 },
-      { label: 'مهارت و تخصص', value: Number(data?.quality_of_treatment) || 0 },
-    ],
-  };
+    return {
+      hideRates: Boolean(data?.hide_rates ?? data?.hide),
+      count: Number(data?.comments_count ?? data?.count_rates ?? 0),
+      items: [
+        { label: 'برخورد مناسب', value: Number(data?.doctor_encounter) || 0 },
+        { label: 'توضیح در هنگام ویزیت', value: Number(data?.explanation_of_issue) || 0 },
+        { label: 'مهارت و تخصص', value: Number(data?.quality_of_treatment) || 0 },
+      ],
+    };
+  } catch (error) {
+    if (isRateSummaryNotFound(error)) {
+      return null;
+    }
+    throw error;
+  }
 };
 
 /** GET /ravi/v1/feedbacks/doctors/{slug} — feedbacks webservice (filter: default | newest | negative). */
@@ -64,10 +75,46 @@ export const fetchReviewPage = async (doctorSlug: string, query: RaviReviewQuery
 export { PAGE_SIZE };
 
 export const fetchReviewerName = async (userId: string): Promise<string | null> => {
+  const info = await fetchReviewerInfo(userId);
+  return info.name;
+};
+
+export const fetchReviewerInfo = async (
+  userId: string,
+): Promise<{ name: string | null; family: string | null }> => {
   const { data } = await apiGatewayClient.get(`/v1/users/${userId}`);
   const users = (data?.users ?? data?.data?.users) as Array<Record<string, unknown>> | undefined;
-  const name = users?.[0]?.name;
-  return typeof name === 'string' && name.trim() ? name.trim() : null;
+  const user = users?.[0];
+  const name = user?.name;
+  const family = user?.family;
+  return {
+    name: typeof name === 'string' && name.trim() ? name.trim() : null,
+    family: typeof family === 'string' && family.trim() ? family.trim() : null,
+  };
+};
+
+/**
+ * GET /ravi/v1/ravi_get_reply — پاسخ پزشک به یک نظر (مطابق ReviewCard2 در Plasmic / Apidog).
+ * where: doctor_slug + reply_to_feedback_id + show=1 + delete=0 + description is not null
+ */
+export const fetchFeedbackReply = async (
+  doctorSlug: string,
+  feedbackId: string,
+): Promise<RaviFeedbackReply | null> => {
+  const where =
+    `(doctor_slug,eq,${doctorSlug})` +
+    `~and(reply_to_feedback_id,eq,${feedbackId})` +
+    `~and(show,eq,1)~and(delete,eq,0)~and(description,isnot,null)`;
+  const { data } = await apiGatewayClient.get('/ravi/v1/ravi_get_reply', {
+    params: { where, limit: 1, offset: 0, sort: '-created_at' },
+  });
+  const item = (data?.list as Array<Record<string, unknown>> | undefined)?.[0];
+  if (!item?.description) return null;
+  return {
+    id: String(item.Id ?? item.id ?? ''),
+    description: String(item.description),
+    userId: item.user_id != null ? String(item.user_id) : undefined,
+  };
 };
 
 export const submitLikeRate = async ({
@@ -80,8 +127,8 @@ export const submitLikeRate = async ({
   userId: string;
 }) =>
   raviApisClient.post(
-    '/ravi/v1/like_rate',
-    { feedback_id: feedbackId, rate, user_id: userId },
+    `/ravi/v1/feedbacks/${encodeURIComponent(feedbackId)}/likes`,
+    { rate, user_id: userId },
     { withCredentials: true },
   );
 
