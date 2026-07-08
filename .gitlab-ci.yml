@@ -5,7 +5,8 @@ build-docker-image:
   stage: build
   image: docker:cli
   services:
-    - docker:dind
+    - name: docker:dind
+      command: ["--registry-mirror=https://docker.devneeds.ir"]
   variables:
     DOCKER_HOST: "tcp://docker:2375"
     DOCKER_TLS_CERTDIR: ""
