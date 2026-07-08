@@ -3,7 +3,6 @@ import dynamic from 'next/dynamic';
 import { ComponentType, useEffect, useState } from 'react';
 import PlasmicSearch from '.plasmic/plasmic/paziresh_24_search/PlasmicSearch';
 import { useDoctorViewSwapActive } from '../hooks/useDoctorViewSwapActive';
-import { useDoctorViewUrlSync } from '../hooks/useDoctorViewUrlSync';
 import { useDoctorViewModeStore, type DoctorViewMode } from '../store/viewMode';
 import { DoctorLauncherContent } from './doctorLauncherContent';
 import { DoctorViewSwitcher } from './doctorViewSwitcher';
@@ -29,8 +28,6 @@ export const DoctorViewSwap = ({
   const swapEnabled = useDoctorViewSwapActive();
   const mode = useDoctorViewModeStore(state => state.mode);
   const [visited, setVisited] = useState<Set<DoctorViewMode>>(() => new Set([mode]));
-
-  useDoctorViewUrlSync(swapEnabled);
 
   useEffect(() => {
     if (!swapEnabled) return;

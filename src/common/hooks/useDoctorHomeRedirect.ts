@@ -4,6 +4,10 @@ import {
   isDoctorDeviceCached,
   redirectCachedDoctorHome,
 } from '@/common/utils/doctorDeviceCache';
+import {
+  useIsNewDoctorLauncherEnabled,
+  useIsNewDoctorLauncherLoading,
+} from '@/modules/doctorHome/hooks/useNewDoctorLauncher';
 import { isPatientViewModeStored } from '@/modules/doctorHome/store/viewMode';
 import { useUserInfoStore, UserInfo } from '@/modules/login/store/userInfo';
 import { useFeatureIsOn } from '@growthbook/growthbook-react';
@@ -25,10 +29,14 @@ export const useDoctorHomeRedirect = () => {
   const isLogin = useUserInfoStore(state => state.isLogin);
   const customize = useCustomize(state => state.customize);
   const launcherAsMainHome = useFeatureIsOn('launcher-as-main-home');
+  const newLauncherLoading = useIsNewDoctorLauncherLoading();
+  const newLauncherEnabled = useIsNewDoctorLauncherEnabled();
   const hasRedirected = useRef(false);
 
   const isCachedDoctor = isDoctorDeviceCached();
   const shouldRedirect =
+    !newLauncherLoading &&
+    !newLauncherEnabled &&
     canRedirectToDoctorHome(customize) &&
     REDIRECT_PATHS.includes(router.pathname) &&
     (launcherAsMainHome || isCachedDoctor) &&
@@ -48,11 +56,11 @@ export const useDoctorHomeRedirect = () => {
   }, [isLogin, isCachedDoctor, router]);
 
   useLayoutEffect(() => {
-    if (hasRedirected.current) return;
+    if (hasRedirected.current || newLauncherLoading || newLauncherEnabled) return;
     if (redirectCachedDoctorHome()) {
       hasRedirected.current = true;
     }
-  }, []);
+  }, [newLauncherEnabled, newLauncherLoading]);
 
   useLayoutEffect(() => {
     if (hasRedirected.current) return;

@@ -16,7 +16,7 @@ import { prefetchOneApp } from '@/modules/hamdast/utils/prefetchOneApp';
 import { useNotificationPermission } from '@/common/hooks/useNotificationPermission';
 import { useUserInfoStore } from '@/modules/login/store/userInfo';
 import { useQueryClient } from '@tanstack/react-query';
-import { DoctorViewSwap, useDoctorViewSwapActive } from '@/modules/doctorHome';
+import { DoctorViewSwap, useDoctorViewSwapActive, useIsNewDoctorLauncherLoading } from '@/modules/doctorHome';
 import { ds } from '@/modules/doctorHome/designSystem/tokens';
 
 const Page = () => {
@@ -24,6 +24,7 @@ const Page = () => {
   const { handleOpen, handleClose, modalProps } = useModal();
   const [app, setApp] = useState<string>('');
   const swapActive = useDoctorViewSwapActive();
+  const doctorLauncherLoading = useIsNewDoctorLauncherLoading();
   const { isResolving, shouldShowLauncher } = useLauncherPageAccess();
   const info = useUserInfoStore(state => state.info);
   const { isSupported, hasPermission, showModal, openModal, closeModal, checkPermission } = useNotificationPermission();
@@ -54,7 +55,11 @@ const Page = () => {
         onClose={closeModal}
         onSuccess={handleSuccess}
       />
-      {swapActive ? (
+      {doctorLauncherLoading ? (
+        <div className="flex min-h-[50vh] flex-grow items-center justify-center">
+          <Loading />
+        </div>
+      ) : swapActive ? (
         <DoctorViewSwap />
       ) : (
         <>
