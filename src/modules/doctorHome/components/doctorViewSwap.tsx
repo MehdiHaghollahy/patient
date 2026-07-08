@@ -19,7 +19,7 @@ const HomePageBody = dynamic(() => import('@/modules/home/views/homePageBody'), 
 
 interface DoctorViewSwapProps {
   fragmentComponents?: Record<string, unknown>;
-  plasmicSearchComponent?: ComponentType<unknown>;
+  plasmicSearchComponent?: ComponentType<any>;
 }
 
 export const DoctorViewSwap = ({
