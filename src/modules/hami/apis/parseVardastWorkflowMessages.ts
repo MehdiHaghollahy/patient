@@ -145,9 +145,7 @@ const parseVardastAttachments = (raw: unknown): VardastWorkflowAttachment[] | un
 
 
   const attachments = raw
-
-    .map(item => {
-
+    .map((item): VardastWorkflowAttachment | null => {
       if (!item || typeof item !== 'object') return null;
 
       const { section, url, content_type } = item as {
@@ -158,13 +156,16 @@ const parseVardastAttachments = (raw: unknown): VardastWorkflowAttachment[] | un
 
       if (typeof url !== 'string' || !url.trim()) return null;
 
-      return {
-        section: typeof section === 'string' ? section.trim() : undefined,
-        url: url.trim(),
-        content_type: typeof content_type === 'string' ? content_type.trim() : undefined,
-      };
-    })
+      const attachment: VardastWorkflowAttachment = { url: url.trim() };
+      if (typeof section === 'string' && section.trim()) {
+        attachment.section = section.trim();
+      }
+      if (typeof content_type === 'string' && content_type.trim()) {
+        attachment.content_type = content_type.trim();
+      }
 
+      return attachment;
+    })
     .filter((item): item is VardastWorkflowAttachment => item !== null);
 
 

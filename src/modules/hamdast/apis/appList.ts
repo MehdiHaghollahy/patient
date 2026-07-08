@@ -50,13 +50,13 @@ export const groupCatalogAppsByCategory = (apps: HamdastCatalogApp[]): CatalogCa
     groups.get(key)!.apps.push(app);
   }
 
-  for (const group of groups.values()) {
+  groups.forEach(group => {
     group.apps.sort((a, b) => {
       const diff = appSortRank(a) - appSortRank(b);
       if (diff !== 0) return diff;
       return (a.title ?? a.app_key).localeCompare(b.title ?? b.app_key, 'fa');
     });
-  }
+  });
 
   return order
     .map(key => groups.get(key)!)
