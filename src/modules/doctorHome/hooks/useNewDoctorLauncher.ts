@@ -5,6 +5,39 @@ import { growthbook } from 'src/pages/_app';
 import { isDoctorUser } from '../store/viewMode';
 
 let latched: { userId: string; enabled: boolean } | null = null;
+let inFlightUserId: string | null = null;
+let inFlight: Promise<boolean> | null = null;
+
+const resolveFlagForUser = async (userId: string) => {
+  if (inFlight && inFlightUserId === userId) {
+    return inFlight;
+  }
+
+  inFlightUserId = userId;
+  inFlight = (async () => {
+    const attributes = growthbook.getAttributes();
+    if (attributes.user_id !== userId) {
+      growthbook.setAttributes({
+        ...attributes,
+        user_id: userId,
+        loggedIn: true,
+        is_doctor: true,
+      });
+    }
+
+    await growthbook.refreshFeatures({ skipCache: true });
+    const enabled = growthbook.isOn('doctor-home:enable');
+    latched = { userId, enabled };
+    return enabled;
+  })().finally(() => {
+    if (inFlightUserId === userId) {
+      inFlight = null;
+      inFlightUserId = null;
+    }
+  });
+
+  return inFlight;
+};
 
 export const useIsNewDoctorLauncherEnabled = () => {
   const user = useUserInfoStore(state => state.info);
@@ -14,15 +47,12 @@ export const useIsNewDoctorLauncherEnabled = () => {
   const userId = user?.id;
   const customize = useCustomize(state => state.customize);
   const [isReady, setIsReady] = useState(growthbook.ready);
-  const [isResolved, setIsResolved] = useState(
-    () => latched != null && latched.userId === (userId != null && userId !== '' ? String(userId) : null),
-  );
-  const [isEnabled, setIsEnabled] = useState(() => latched?.enabled ?? false);
+  const [isResolved, setIsResolved] = useState(false);
+  const [isEnabled, setIsEnabled] = useState(false);
 
   const isDoctor = !customize.partnerKey && isDoctorUser(user);
   const normalizedUserId = userId != null && userId !== '' ? String(userId) : null;
-  const shouldResolve =
-    isDoctor && isLogin && normalizedUserId != null && !pending && !doctorProfilePending && isReady;
+  const canResolve = isLogin && normalizedUserId != null && !pending && !doctorProfilePending && isReady;
 
   useEffect(() => {
     const unsubscribe = growthbook.subscribe(() => {
@@ -33,15 +63,10 @@ export const useIsNewDoctorLauncherEnabled = () => {
   }, []);
 
   useEffect(() => {
-    if (!isLogin || !normalizedUserId || !isDoctor) {
+    if (!isLogin || !normalizedUserId) {
       latched = null;
       setIsResolved(false);
       setIsEnabled(false);
-      return;
-    }
-
-    if (!shouldResolve) {
-      setIsResolved(false);
       return;
     }
 
@@ -51,32 +76,23 @@ export const useIsNewDoctorLauncherEnabled = () => {
       return;
     }
 
+    if (!canResolve) {
+      setIsResolved(false);
+      return;
+    }
+
     let cancelled = false;
 
-    void (async () => {
-      const attributes = growthbook.getAttributes();
-      if (attributes.user_id !== normalizedUserId) {
-        growthbook.setAttributes({
-          ...attributes,
-          user_id: normalizedUserId,
-          loggedIn: true,
-          is_doctor: true,
-        });
-      }
-
-      await growthbook.refreshFeatures({ skipCache: true });
+    void resolveFlagForUser(normalizedUserId).then(enabled => {
       if (cancelled) return;
-
-      const enabled = growthbook.isOn('doctor-home:enable');
-      latched = { userId: normalizedUserId, enabled };
       setIsEnabled(enabled);
       setIsResolved(true);
-    })();
+    });
 
     return () => {
       cancelled = true;
     };
-  }, [isDoctor, isLogin, normalizedUserId, shouldResolve]);
+  }, [canResolve, isLogin, normalizedUserId]);
 
   if (!isDoctor || !isLogin || !normalizedUserId) {
     return false;
@@ -109,6 +125,6 @@ export const useIsNewDoctorLauncherLoading = () => {
     isDoctor &&
     isLogin &&
     !!normalizedUserId &&
-    (pending || doctorProfilePending || !isReady || latched?.userId !== normalizedUserId)
+    (pending || doctorProfilePending || !isReady || (latched?.userId !== normalizedUserId && inFlightUserId !== normalizedUserId))
   );
 };
