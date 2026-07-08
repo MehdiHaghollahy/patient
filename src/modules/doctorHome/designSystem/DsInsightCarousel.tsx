@@ -1,4 +1,6 @@
 import Skeleton from '@/common/components/atom/skeleton';
+import EyeIcon from '@/common/components/icons/eye';
+import EyeSlashIcon from '@/common/components/icons/eyeSlash';
 import classNames from '@/common/utils/classNames';
 import Link from 'next/link';
 import { ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -21,11 +23,16 @@ export interface DsInsightItem {
   title: string;
   description: string;
   value?: string | number | null;
+  hiddenValue?: string;
   tint?: string;
   isLoading?: boolean;
   href?: string;
   onClick?: () => void;
   onPress?: () => void;
+  visibilityToggle?: {
+    isVisible: boolean;
+    onToggle: () => void;
+  };
 }
 
 const isRtlElement = (el: HTMLElement) => getComputedStyle(el).direction === 'rtl';
@@ -52,16 +59,67 @@ const getScrollMetrics = (el: HTMLElement) => {
   };
 };
 
-const InsightCard = ({ item }: { item: DsInsightItem }) => (
-  <div
-    className={classNames(
-      ds.radius.card,
-      ds.shadow.card,
-      'flex h-[8.75rem] w-[10.75rem] flex-col justify-between border border-slate-100/90 bg-white p-4',
-      'transition-[box-shadow] duration-200 ease-out',
-      item.href && 'hover:shadow-lg',
-    )}
-  >
+const InsightCard = ({ item }: { item: DsInsightItem }) => {
+  const isValueVisible = !item.visibilityToggle || item.visibilityToggle.isVisible;
+  const displayValue = isValueVisible ? item.value : (item.hiddenValue ?? '••••••');
+  const isWalletCard = !!item.visibilityToggle;
+
+  const cardClassName = classNames(
+    ds.radius.card,
+    ds.shadow.card,
+    'flex h-[8.75rem] w-[10.75rem] flex-col border border-slate-100/90 bg-white p-4',
+    'transition-[box-shadow] duration-200 ease-out',
+    item.href && 'hover:shadow-lg',
+    isWalletCard ? 'justify-between' : 'justify-between',
+  );
+
+  if (isWalletCard) {
+    return (
+      <div className={cardClassName}>
+        <div className="flex items-center justify-between gap-2">
+          <div
+            className={classNames(
+              'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
+              item.tint ?? ds.surface.primarySoft,
+            )}
+          >
+            <span className="text-primary">{item.icon}</span>
+          </div>
+          <button
+            type="button"
+            onClick={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              item.visibilityToggle?.onToggle();
+            }}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            aria-label={item.visibilityToggle?.isVisible ? 'پنهان کردن موجودی' : 'نمایش موجودی'}
+            aria-pressed={!item.visibilityToggle?.isVisible}
+          >
+            {item.visibilityToggle?.isVisible ? (
+              <EyeSlashIcon width={14} height={14} />
+            ) : (
+              <EyeIcon width={14} height={14} />
+            )}
+          </button>
+        </div>
+        <div className="min-w-0">
+          {item.isLoading ? (
+            <Skeleton h="1.5rem" w="5rem" rounded="md" />
+          ) : (
+            <p className="truncate text-lg font-bold tabular-nums leading-tight text-slate-900">{displayValue}</p>
+          )}
+          <p className={classNames(ds.type.cardTitle, 'mt-1.5')}>{item.title}</p>
+          {!item.isLoading && (
+            <p className={classNames(ds.type.caption, 'mt-0.5')}>{item.description}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+  <div className={cardClassName}>
     <div className="flex items-center justify-between gap-2">
       <div
         className={classNames(
@@ -71,13 +129,15 @@ const InsightCard = ({ item }: { item: DsInsightItem }) => (
       >
         <span className="text-primary">{item.icon}</span>
       </div>
-      {item.isLoading ? (
-        <Skeleton h="1.75rem" w="3rem" rounded="md" />
-      ) : (
-        item.value != null && (
-          <span className="text-2xl font-bold tabular-nums leading-none text-slate-900">{item.value}</span>
-        )
-      )}
+      <div className="flex min-w-0 items-center justify-end">
+        {item.isLoading ? (
+          <Skeleton h="1.75rem" w="3rem" rounded="md" />
+        ) : (
+          displayValue != null && (
+            <span className="text-2xl font-bold tabular-nums leading-none text-slate-900">{displayValue}</span>
+          )
+        )}
+      </div>
     </div>
     <div>
       <p className={ds.type.cardTitle}>{item.title}</p>
@@ -88,10 +148,21 @@ const InsightCard = ({ item }: { item: DsInsightItem }) => (
       )}
     </div>
   </div>
-);
+  );
+};
 
 
-export const DsInsightCarousel = ({ items, className }: { items: DsInsightItem[]; className?: string }) => {
+export const DsInsightCarousel = ({
+  items,
+  className,
+  header,
+  footer,
+}: {
+  items: DsInsightItem[];
+  className?: string;
+  header?: ReactNode;
+  footer?: ReactNode;
+}) => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const pullRawRef = useRef(0);
@@ -270,15 +341,24 @@ export const DsInsightCarousel = ({ items, className }: { items: DsInsightItem[]
   }, [api, applyPull, releasePull, runMomentum, scrollDir]);
 
   const wasDragged = () => pointerRef.current.dragDistance > DRAG_CLICK_THRESHOLD;
+  const hasBandPadding = !!(header || footer);
 
   return (
     <div className={className}>
-      <div className="relative -mx-4 -mb-6 overflow-x-clip bg-[#F2F3F5]">
+      <div
+        className={classNames(
+          'relative -mx-4 overflow-x-clip',
+          ds.surface.page,
+          hasBandPadding ? 'pb-4' : '-mb-6',
+        )}
+      >
+        {header ? <div className="px-4 pb-3 pt-3">{header}</div> : null}
         <div
           ref={viewportRef}
           dir={scrollDir}
           className={classNames(
-            'relative z-[1] overflow-x-auto px-4 pb-8 pt-0.5',
+            'relative z-[1] overflow-x-auto px-4 pt-0.5',
+            hasBandPadding ? 'pb-3' : 'pb-8',
             'cursor-grab select-none touch-none no-scroll active:cursor-grabbing',
           )}
           style={{ WebkitOverflowScrolling: 'touch' }}
@@ -326,6 +406,7 @@ export const DsInsightCarousel = ({ items, className }: { items: DsInsightItem[]
             ))}
           </animated.div>
         </div>
+        {footer ? <div className="px-4">{footer}</div> : null}
       </div>
     </div>
   );

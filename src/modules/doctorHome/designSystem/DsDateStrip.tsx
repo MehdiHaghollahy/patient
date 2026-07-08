@@ -4,22 +4,30 @@ import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, u
 import { flushSync } from 'react-dom';
 import { animated, useSpring } from 'react-spring';
 import { HOLIDAY_YEAR_END, HOLIDAY_YEAR_START, useHolidays } from '../apis/holidays';
-import { useFullDayVacationSet } from '../apis/vacations';
+import { useDoctorVacations } from '../apis/vacations';
 import { useSelectedDateStore } from '../store/selectedDate';
+import { useSelectedCenterStore } from '../store/selectedCenter';
+import { getVacationCenterTargets } from '../utils/centers';
 import { useUserInfoStore } from '@/modules/login/store/userInfo';
 import { ds } from './tokens';
 
 const BUFFER = 30;
 const SNAP_MAX = 7;
 const SNAP_SPRING = { tension: 320, friction: 30, mass: 1 };
+/** Fixed pill around the selected day — must not scale with viewport cell width */
+const SLOT_FRAME_W = 48;
+const SLOT_FRAME_H = 65;
+const SLOT_FRAME_OFFSET_Y = 0;
 
 export interface DsDateStripRef {
   goToToday: () => void;
 }
 
-export const DsDateStrip = forwardRef<DsDateStripRef, { className?: string }>(({ className }, ref) => {
+export const DsDateStrip = forwardRef<DsDateStripRef, { className?: string; markedDates?: Set<string> }>(
+  ({ className, markedDates }, ref) => {
   const today = moment();
   const selectedDate = useSelectedDateStore(s => s.selectedDate);
+  const selectedCenterId = useSelectedCenterStore(s => s.selectedCenterId);
   const setSelectedDate = useSelectedDateStore(s => s.setSelectedDate);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -70,14 +78,11 @@ export const DsDateStrip = forwardRef<DsDateStripRef, { className?: string }>(({
   const isToday = selectedMoment.isSame(today, 'day');
 
   const user = useUserInfoStore(s => s.info);
-  const centerIds = useMemo(
-    () => (user?.provider?.centers ?? []).map((c: { id?: string }) => c.id).filter((id): id is string => !!id),
-    [user?.provider?.centers],
-  );
+  const vacationCenterTargets = useMemo(() => getVacationCenterTargets(user ?? undefined), [user]);
 
   const { data: holidays } = useHolidays(HOLIDAY_YEAR_START, HOLIDAY_YEAR_END);
   const holidaySet = useMemo(() => new Set((holidays ?? []).filter(h => h.is_holiday).map(h => h.date)), [holidays]);
-  const vacationSet = useFullDayVacationSet(centerIds, selectedDate);
+  const { fullDaySet: vacationSet } = useDoctorVacations(vacationCenterTargets, selectedDate, selectedCenterId);
 
   useEffect(() => { selectedMomentRef.current = selectedMoment; }, [selectedMoment]);
 
@@ -258,6 +263,7 @@ export const DsDateStrip = forwardRef<DsDateStripRef, { className?: string }>(({
                 const isMonthBoundary = idx < TOTAL - 1 && day.jMonth() !== days[idx + 1].jMonth();
                 const isHoliday = holidaySet.has(isoDate) || day.day() === 5;
                 const isVacation = vacationSet.has(isoDate);
+                const hasNotification = markedDates?.has(isoDate) ?? false;
 
                 return (
                   <div
@@ -311,7 +317,13 @@ export const DsDateStrip = forwardRef<DsDateStripRef, { className?: string }>(({
                     <span
                       className={classNames(
                         'h-1 w-1 rounded-full',
-                        isDayToday && !isSelected ? 'bg-primary' : 'bg-transparent',
+                        hasNotification
+                          ? isSelected
+                            ? 'bg-amber-400'
+                            : 'bg-amber-500'
+                          : isDayToday && !isSelected
+                            ? 'bg-primary'
+                            : 'bg-transparent',
                       )}
                     />
                   </div>
@@ -325,26 +337,28 @@ export const DsDateStrip = forwardRef<DsDateStripRef, { className?: string }>(({
         <div
           aria-hidden
           className="pointer-events-none absolute inset-y-0 left-0 z-10"
-          style={{ width: '18%', background: 'linear-gradient(to right, #F2F3F5 30%, transparent)' }}
+          style={{ width: '18%', background: `linear-gradient(to right, ${ds.surface.pageColor} 30%, transparent)` }}
         />
         <div
           aria-hidden
           className="pointer-events-none absolute inset-y-0 right-0 z-10"
-          style={{ width: '18%', background: 'linear-gradient(to left, #F2F3F5 30%, transparent)' }}
+          style={{ width: '18%', background: `linear-gradient(to left, ${ds.surface.pageColor} 30%, transparent)` }}
         />
 
-        {/* ── Center slot indicator — fixed, outside scroll & mask ──────── */}
+        {/* ── Center slot indicator — fixed size, centered in middle cell ─ */}
         {cellW > 0 && (
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-y-0 z-20"
+            className="pointer-events-none absolute inset-y-0 z-20 flex items-center justify-center"
             style={{ left: 3 * cellW, width: cellW }}
           >
             <div
-              className="mx-1 h-[calc(100%-4px)]"
+              className="shrink-0"
               style={{
-                marginTop: '-0.1rem',
-                borderRadius: 52,
+                width: SLOT_FRAME_W,
+                height: SLOT_FRAME_H,
+                borderRadius: SLOT_FRAME_H / 2,
+                transform: `translateY(${SLOT_FRAME_OFFSET_Y}px)`,
                 boxShadow: '0 0 0 1.5px rgba(0,0,0,0.08), 0 2px 10px rgba(0,0,0,0.07)',
               }}
             />
@@ -354,4 +368,5 @@ export const DsDateStrip = forwardRef<DsDateStripRef, { className?: string }>(({
 
     </div>
   );
-});
+},
+);

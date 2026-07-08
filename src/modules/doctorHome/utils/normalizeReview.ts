@@ -1,8 +1,38 @@
 import {
+  formatFeedbackLocalTime,
   formatRelativeFeedbackTime,
   getFeedbackCreatedAtValue,
+  getFeedbackLocalDateKey,
 } from '@/common/utils/formatRelativeFeedbackTime';
 import { DoctorHomeFeedReview } from '../types/feed';
+import { matchesSelectedCenter } from './centers';
+
+export const isReviewInSelectedDate = (item: Record<string, unknown>, selectedDate: string): boolean =>
+  getFeedbackLocalDateKey(getFeedbackCreatedAtValue(item)) === selectedDate;
+
+export const filterReviewsBySelectedCenter = (
+  items: Array<Record<string, unknown>>,
+  selectedCenterId?: string | null,
+) => {
+  if (!selectedCenterId) return items;
+  return items.filter(item => matchesSelectedCenter(item.center_id as string | undefined, selectedCenterId));
+};
+
+export const filterReviewsBySelectedDate = (
+  items: Array<Record<string, unknown>>,
+  selectedDate: string,
+) => items.filter(item => isReviewInSelectedDate(item, selectedDate));
+
+const formatReviewCreatedTime = (
+  item: Record<string, unknown>,
+  selectedDate?: string,
+): string | undefined => {
+  const createdAtValue = getFeedbackCreatedAtValue(item);
+  if (selectedDate && getFeedbackLocalDateKey(createdAtValue) === selectedDate) {
+    return formatFeedbackLocalTime(createdAtValue);
+  }
+  return formatRelativeFeedbackTime(createdAtValue);
+};
 
 /**
  * نرمال‌سازی یک آیتم خام feedback (از ravi) به مدل نمایش نظر.
@@ -11,6 +41,7 @@ import { DoctorHomeFeedReview } from '../types/feed';
 export const mapRawReviewToFeed = (
   item: Record<string, unknown>,
   slug?: string,
+  options?: { selectedDate?: string },
 ): DoctorHomeFeedReview => {
   const rateRaw = item.avg_rate_value ?? item.avgRateValue ?? item.rate ?? item.avg_rate ?? null;
   const rateNum = rateRaw != null && rateRaw !== '' ? Number(rateRaw) : null;
@@ -31,7 +62,7 @@ export const mapRawReviewToFeed = (
     id: (item.id ?? item.Id) as string | number | undefined,
     description: item.description as string | undefined,
     recommended: item.recommended as string | number | boolean | undefined,
-    relativeCreatedTime: formatRelativeFeedbackTime(getFeedbackCreatedAtValue(item)),
+    relativeCreatedTime: formatReviewCreatedTime(item, options?.selectedDate),
     userId: (item.user_id ?? item.userId) as string | number | undefined,
     userName: typeof nameRaw === 'string' && nameRaw.trim() ? nameRaw.trim() : undefined,
     rate: rateNum != null && Number.isFinite(rateNum) ? rateNum : null,

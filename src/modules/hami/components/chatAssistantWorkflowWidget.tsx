@@ -1,10 +1,18 @@
 import classNames from '@/common/utils/classNames';
 import {
+  detectTextDirection,
+  getTextDirectionClass,
+  getVardastBubbleTailClass,
+} from '@/common/utils/detectTextDirection';
+import {
   parseVardastContent,
   VardastWorkflowMessageItem,
 } from '@/modules/hami/apis/parseVardastWorkflowMessages';
 import { ChatAssistantAppSource } from '@/modules/hami/components/chatAssistantAppSource';
-import { ChatAssistantRichContent } from '@/modules/hami/components/chatAssistantRichContent';
+import {
+  ChatAssistantRichContent,
+  getRichContentDirection,
+} from '@/modules/hami/components/chatAssistantRichContent';
 import {
   ChatAssistantWorkflowAttachments,
   isImageAttachment,
@@ -30,6 +38,9 @@ export const ChatAssistantWorkflowWidget = ({
   const statusTitle = title.trim();
   const imageAttachments = (item.attachments ?? []).filter(isImageAttachment);
   const fileAttachments = (item.attachments ?? []).filter(attachment => !isImageAttachment(attachment));
+  const contentDirection = body
+    ? getRichContentDirection(hasHtmlBody ? body : undefined, !hasHtmlBody ? body : undefined)
+    : detectTextDirection(statusTitle);
 
   return (
     <div
@@ -39,16 +50,28 @@ export const ChatAssistantWorkflowWidget = ({
       })}
       style={{ transitionDelay: visible ? `${80 + index * 50}ms` : '0ms' }}
     >
-      <div className={classNames('overflow-hidden rounded-2xl rounded-br-md p-4', vardastGlass.bubble)}>
+      <div
+        dir={contentDirection}
+        className={classNames(
+          'overflow-hidden rounded-2xl p-4',
+          getVardastBubbleTailClass(contentDirection),
+          getTextDirectionClass(contentDirection),
+          vardastGlass.bubble,
+        )}
+      >
         {item.app?.key && item.app?.name && <ChatAssistantAppSource app={item.app} />}
 
         {statusTitle && (
-          <div className="mb-3 border-b border-white/50 pb-3 text-right">
+          <div className="mb-3 border-b border-white/50 pb-3">
             <p className={vardastType.cardTitle}>{statusTitle}</p>
           </div>
         )}
 
-        <ChatAssistantRichContent html={hasHtmlBody ? body : undefined} plain={!hasHtmlBody ? body : undefined} />
+        <ChatAssistantRichContent
+          direction={contentDirection}
+          html={hasHtmlBody ? body : undefined}
+          plain={!hasHtmlBody ? body : undefined}
+        />
 
         <ChatAssistantWorkflowAttachments
           imageAttachments={imageAttachments}

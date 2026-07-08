@@ -6,6 +6,7 @@ import { withServerUtils } from '@/common/hoc/withServerUtils';
 import { useDoctorHomeRedirectLoading } from '@/common/hooks/useDoctorHomeRedirectLoading';
 import { getServerSideGrowthBookContext } from '@/common/helper/getServerSideGrowthBookContext';
 import { getHost, HeaderBag } from '@/common/utils/getHost';
+import { DoctorViewSwap, useDoctorViewSwapActive } from '@/modules/doctorHome';
 import { GrowthBook } from '@growthbook/growthbook-react';
 import dynamic from 'next/dynamic';
 import { GetServerSidePropsContext, NextApiRequest } from 'next/types';
@@ -13,15 +14,26 @@ import { ReactElement, useLayoutEffect } from 'react';
 import PlasmicSearch from '.plasmic/plasmic/paziresh_24_search/PlasmicSearch';
 import { useSearchStore } from '@/modules/search/store/search';
 
-const HomePageBody = dynamic(() => import('@/modules/home/views/homePageBody'));
+const HomePageBody = dynamic(() => import('@/modules/home/views/homePageBody'), {
+  loading: () => (
+    <div className="flex min-h-[50vh] flex-grow items-center justify-center">
+      <Loading />
+    </div>
+  ),
+});
 
 const Home = ({ fragmentComponents }: any) => {
+  const swapActive = useDoctorViewSwapActive();
   const showRedirectLoading = useDoctorHomeRedirectLoading();
   const setIsOpenSuggestion = useSearchStore(state => state.setIsOpenSuggestion);
 
   useLayoutEffect(() => {
     setIsOpenSuggestion(false);
   }, [setIsOpenSuggestion]);
+
+  if (swapActive) {
+    return <DoctorViewSwap fragmentComponents={fragmentComponents} plasmicSearchComponent={PlasmicSearch} />;
+  }
 
   if (showRedirectLoading) {
     return (
@@ -97,7 +109,7 @@ export const getServerSideProps = withCSR(
       const growthbookContext = getServerSideGrowthBookContext(context.req as NextApiRequest);
       const growthbook = new GrowthBook(growthbookContext);
       growthbook.setAttributes({ url });
-      await growthbook.loadFeatures({ timeout: 500 });
+      await growthbook.loadFeatures({ timeout: 200 });
 
       showPlasmicSuggestion = growthbook.isOn('search_plasmic_suggestion');
       showPlasmicRecentSearch = growthbook.isOn('search_plasmic_recent_search');

@@ -7,15 +7,27 @@ import { useMemo } from 'react';
 import { useDoctorPageView } from '../apis/pageView';
 import { useSanjeScore } from '../apis/sanjeScore';
 import { useUpcomingAppointments } from '../apis/upcomingAppointments';
-import { getClinicCenters, getDoctorSlug, getOnlineVisitCenter, hasOnlineVisitCenter } from '../utils/centers';
+import {
+  getDoctorSlug,
+  getOnlineVisitCenter,
+  hasOnlineVisitCenter,
+  matchesSelectedCenter,
+  resolveAppointmentCenters,
+  resolveCountCenterId,
+  shouldShowOnlineVisitSection,
+} from '../utils/centers';
 import { useAppointmentsCount } from '@/modules/profile/apis/appointmentsCount';
+import { getTehranDayUtcBounds } from '@/common/utils/nocodbDateFilter';
 import { useSelectedDateStore } from '../store/selectedDate';
+import { useSelectedCenterStore } from '../store/selectedCenter';
 
 const getDateRange = (isoDate: string) => {
   const d = moment(isoDate, 'YYYY-MM-DD');
+  const dayStart = d.clone().startOf('jDay');
+  const dayEnd = d.clone().endOf('jDay');
   return {
-    from_greather_than: d.clone().startOf('jDay').unix(),
-    from_less_than: d.clone().endOf('jDay').unix(),
+    from_greather_than: dayStart.unix(),
+    from_less_than: dayEnd.unix(),
   };
 };
 
@@ -40,46 +52,39 @@ const extractRatingFromRate = (
   };
 };
 
-const getCountCenterId = (user?: UserInfo) => {
-  const centers = user?.provider?.centers ?? [];
-  const withUserCenterId = centers.find((center: { user_center_id?: string }) => center.user_center_id);
-  if (withUserCenterId?.user_center_id) return String(withUserCenterId.user_center_id);
-
-  const onlineCenter = getOnlineVisitCenter(user) as { user_center_id?: string } | undefined;
-  if (onlineCenter?.user_center_id) return String(onlineCenter.user_center_id);
-
-  const firstClinic = getClinicCenters(user)[0] as { id?: string } | undefined;
-  if (firstClinic?.id) return String(firstClinic.id);
-
-  return undefined;
-};
+const getCountCenterId = resolveCountCenterId;
 
 export const useDoctorHomeData = (user?: UserInfo) => {
   const slug = getDoctorSlug(user);
   const isDoctor = !!user?.is_doctor && user?.provider?.job_title === 'doctor';
   const onlineVisitCenter = getOnlineVisitCenter(user);
-  const countCenterId = useMemo(() => getCountCenterId(user), [user]);
-  const appointmentCenters = useMemo(
-    () =>
-      (user?.provider?.centers ?? [])
-        .map((center: { id?: string }) => ({ id: center.id }))
-        .filter((center): center is { id: string } => !!center.id),
-    [user?.provider?.centers],
-  );
-
   const selectedDate = useSelectedDateStore(s => s.selectedDate);
+  const selectedCenterId = useSelectedCenterStore(s => s.selectedCenterId);
+  const countCenterId = useMemo(() => getCountCenterId(user, selectedCenterId), [user, selectedCenterId]);
+  const appointmentCenters = useMemo(
+    () => resolveAppointmentCenters(user, selectedCenterId),
+    [user, selectedCenterId],
+  );
 
   const sanjeScore = useSanjeScore(isDoctor);
   const pageView = useDoctorPageView(slug);
   const rate = useRate({ slug: slug! }, { enabled: isDoctor && !!slug, staleTime: 5 * 60 * 1000 });
   const upcomingAppointments = useUpcomingAppointments(appointmentCenters, isDoctor, selectedDate);
+  const dateRange = useMemo(() => getDateRange(selectedDate), [selectedDate]);
+  const createdAtBounds = useMemo(() => getTehranDayUtcBounds(selectedDate), [selectedDate]);
   const reviews = useGetReview(
-    { slug, sort: 'created_at', offset: 0 },
+    {
+      slug,
+      sort: 'created_at',
+      offset: 0,
+      limit: 30,
+      createdAtFrom: createdAtBounds.from,
+      createdAtTo: createdAtBounds.to,
+      ...(selectedCenterId ? { center_id: selectedCenterId } : {}),
+    },
     { enabled: isDoctor && !!slug, staleTime: 2 * 60 * 1000 },
   );
   const notifications = useGetNotifications(undefined, { enabled: isDoctor, staleTime: 60 * 1000 });
-
-  const dateRange = useMemo(() => getDateRange(selectedDate), [selectedDate]);
 
   const allBooksSettled = !upcomingAppointments.isLoading && !upcomingAppointments.isFetching;
   const shouldUseFallbackCount =
@@ -100,6 +105,12 @@ export const useDoctorHomeData = (user?: UserInfo) => {
 
   const satisfaction = useMemo(() => extractRatingFromRate(rate.data), [rate.data]);
 
+  const appointmentItems = useMemo(() => {
+    const items = upcomingAppointments.data?.items ?? [];
+    if (!selectedCenterId) return items;
+    return items.filter(item => matchesSelectedCenter(item.center_id, selectedCenterId));
+  }, [upcomingAppointments.data?.items, selectedCenterId]);
+
   const todayCount = useMemo(() => {
     const fromAllBooks = upcomingAppointments.data?.today_count;
     if (fromAllBooks != null && Number.isFinite(fromAllBooks)) {
@@ -114,7 +125,7 @@ export const useDoctorHomeData = (user?: UserInfo) => {
       return fromFallback;
     }
 
-    const partialItems = upcomingAppointments.data?.items?.length ?? 0;
+    const partialItems = appointmentItems.length;
     if (partialItems > 0) {
       return partialItems;
     }
@@ -126,6 +137,8 @@ export const useDoctorHomeData = (user?: UserInfo) => {
     return null;
   }, [
     upcomingAppointments.data,
+    appointmentItems.length,
+    selectedCenterId,
     fallbackAppointmentsCount.data,
     fallbackAppointmentsCount.isError,
     allBooksSettled,
@@ -138,7 +151,22 @@ export const useDoctorHomeData = (user?: UserInfo) => {
       upcomingAppointments.isFetching ||
       (shouldUseFallbackCount && fallbackAppointmentsCount.isLoading));
 
-  const notificationItems = notifications.data?.data?.items ?? [];
+  const notificationItems = (notifications.data?.data?.items ?? []).map(
+    (item: {
+      id?: string | number;
+      title?: string;
+      description?: string;
+      sender?: string;
+      created_at?: string;
+      createdAt?: string;
+    }) => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      sender: item.sender,
+      created_at: item.created_at ?? item.createdAt,
+    }),
+  );
 
   return {
     slug,
@@ -157,7 +185,7 @@ export const useDoctorHomeData = (user?: UserInfo) => {
       isPageViewLoading: pageView.isLoading,
     },
     appointments: {
-      items: upcomingAppointments.data?.items ?? [],
+      items: appointmentItems,
       todayCount,
       isLoading: upcomingAppointments.isLoading,
       isError: upcomingAppointments.isError,
@@ -166,7 +194,7 @@ export const useDoctorHomeData = (user?: UserInfo) => {
       items: reviews.data?.list ?? [],
       isLoading: reviews.isLoading,
     },
-    notifications: notificationItems.slice(0, 3),
+    notifications: notificationItems,
     hasNotifications: notificationItems.length > 0,
   };
 };

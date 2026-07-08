@@ -163,3 +163,33 @@ export const reportFeedback = async ({
     .catch(() => undefined);
   return res;
 };
+
+export const submitFeedbackReply = async ({
+  feedbackId,
+  description,
+  doctorId,
+}: {
+  feedbackId: string;
+  description: string;
+  doctorId?: string;
+}) => {
+  const res = await apiGatewayClient.post(
+    `/ravi/v1/feedbacks/reply?id=${feedbackId}`,
+    { feedback_id: feedbackId, description },
+    { withCredentials: true },
+  );
+  apiGatewayClient
+    .post(
+      `/ravi/v1/reply-webhook?id=${feedbackId}`,
+      { doctor_id: doctorId, comment_id: feedbackId, reply_text: description },
+      { withCredentials: true },
+    )
+    .catch(() => undefined);
+  return res;
+};
+
+export const editFeedbackReply = async ({ replyId, description }: { replyId: string; description: string }) =>
+  apiGatewayClient.patch(`/ravi/v2/feedbacks?id=${replyId}`, { description }, { withCredentials: true });
+
+export const deleteFeedbackReply = async (replyId: string) =>
+  apiGatewayClient.delete(`/ravi/v1/feedbacks/${replyId}`, { withCredentials: true });

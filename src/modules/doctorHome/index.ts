@@ -4,6 +4,8 @@ export { DoctorHomeFeed } from './components/doctorHomeFeed';
 export { CollapsedToolsSection } from './components/collapsedToolsSection';
 export { DoctorLauncherContent } from './components/doctorLauncherContent';
 export { DoctorViewSwitcher } from './components/doctorViewSwitcher';
+export { DoctorViewSwap } from './components/doctorViewSwap';
 export { useDoctorViewModeStore } from './store/viewMode';
 export type { DoctorViewMode } from './store/viewMode';
+export { useDoctorViewSwapActive } from './hooks/useDoctorViewSwapActive';
 export { useIsNewDoctorLauncherEnabled } from './hooks/useNewDoctorLauncher';

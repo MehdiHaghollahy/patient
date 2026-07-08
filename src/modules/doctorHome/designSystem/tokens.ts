@@ -2,6 +2,8 @@
  * Paziresh24 design tokens — aligned with tailwind.config + Plasmic DS
  * primary #3861fb · brand #3F3F79 · secondary #00acac · gray #F8FAFB
  */
+export const DOCTOR_HOME_PAGE_COLOR = '#F6F7F9';
+
 export const ds = {
   radius: {
     card: 'rounded-2xl',
@@ -14,8 +16,8 @@ export const ds = {
     sm: 'shadow-sm',
   },
   surface: {
-    pageColor: '#F2F3F5',
-    page: 'bg-[#F2F3F5]',
+    pageColor: DOCTOR_HOME_PAGE_COLOR,
+    page: 'bg-[#F6F7F9]',
     card: 'bg-white border border-slate-100',
     muted: 'bg-slate-100',
     primarySoft: 'bg-primary/5',

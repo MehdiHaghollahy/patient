@@ -1,5 +1,7 @@
 export const DOCTOR_DEVICE_CACHE_KEY = 'doctor-home-device';
 
+const DOCTOR_VIEW_MODE_STORAGE_KEY = 'doctor-home-view-mode';
+
 const REDIRECT_PATHS = ['/', '/apphome'];
 
 export const setDoctorDeviceCache = () => {
@@ -18,6 +20,7 @@ export const isDoctorDeviceCached = () =>
 export const shouldRedirectCachedDoctorHome = () => {
   if (typeof window === 'undefined') return false;
   if (!isDoctorDeviceCached()) return false;
+  if (sessionStorage.getItem(DOCTOR_VIEW_MODE_STORAGE_KEY) === 'patient') return false;
   if (!window.matchMedia('(max-width: 767px)').matches) return false;
   return REDIRECT_PATHS.includes(window.location.pathname);
 };
@@ -29,4 +32,4 @@ export const redirectCachedDoctorHome = () => {
 };
 
 /** Runs before React hydrates — must stay in sync with helpers above. */
-export const DOCTOR_HOME_INLINE_REDIRECT_SCRIPT = `(function(){try{var k='${DOCTOR_DEVICE_CACHE_KEY}';if(localStorage.getItem(k)!=='1')return;if(!window.matchMedia('(max-width:767px)').matches)return;var p=location.pathname;if(p==='/'||p==='/apphome')location.replace('/_/');}catch(e){}})();`;
+export const DOCTOR_HOME_INLINE_REDIRECT_SCRIPT = `(function(){try{var m='${DOCTOR_VIEW_MODE_STORAGE_KEY}';if(sessionStorage.getItem(m)==='patient')return;var k='${DOCTOR_DEVICE_CACHE_KEY}';if(localStorage.getItem(k)!=='1')return;if(!window.matchMedia('(max-width:767px)').matches)return;var p=location.pathname;if(p==='/'||p==='/apphome')location.replace('/_/');}catch(e){}})();`;

@@ -12,5 +12,19 @@ export const detectTextDirection = (text: string, fallback: TextDirection = 'rtl
   return fallback;
 };
 
+export const stripHtmlForDirection = (html: string) =>
+  html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+export const detectContentDirection = (
+  options: { html?: string; plain?: string },
+  fallback: TextDirection = 'rtl',
+): TextDirection => {
+  const text = options.html ? stripHtmlForDirection(options.html) : options.plain ?? '';
+  return detectTextDirection(text, fallback);
+};
+
 export const getTextDirectionClass = (direction: TextDirection) =>
   direction === 'rtl' ? 'text-right' : 'text-left';
+
+export const getVardastBubbleTailClass = (direction: TextDirection) =>
+  direction === 'ltr' ? 'rounded-bl-md' : 'rounded-br-md';

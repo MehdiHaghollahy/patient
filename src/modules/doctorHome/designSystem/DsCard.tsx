@@ -8,12 +8,13 @@ interface DsCardProps {
   className?: string;
   href?: string;
   onClick?: () => void;
-  padding?: 'none' | 'md' | 'lg';
+  padding?: 'none' | 'sm' | 'md' | 'lg';
   interactive?: boolean;
 }
 
 const paddingMap = {
   none: '',
+  sm: 'p-3',
   md: 'p-4',
   lg: 'p-5',
 };

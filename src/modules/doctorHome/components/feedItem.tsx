@@ -1,31 +1,31 @@
 import Skeleton from '@/common/components/atom/skeleton';
-import Switch from '@/common/components/atom/switch';
-import BellIcon from '@/common/components/icons/bell';
-import ChatIcon from '@/common/components/icons/chat';
 import classNames from '@/common/utils/classNames';
-import { removeHtmlTagInString } from '@/common/utils/removeHtmlTagInString';
 import { useUserInfoStore } from '@/modules/login/store/userInfo';
+import { RaviCard } from '@/modules/rate-and-review';
 import moment from 'jalali-moment';
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/router';
-import { useOnlineVisitServices, useToggleOnlineVisit } from '../apis/onlineVisit';
 import { UpcomingAppointment } from '../apis/upcomingAppointments';
 import { DsDrawer } from './DsDrawer';
-import { AllAppointmentsDrawerContent, AppointmentDetailContent, PaginatedReviewsList, ReviewDetailContent, ReviewHeader } from './feedDrawerContents';
-import { useSheetRoute } from '../hooks/useSheetRoute';
+import { sheetDrawerProps, useSheetRoute } from '../hooks/useSheetRoute';
+import { useSelectedDateStore } from '../store/selectedDate';
+import { RAVI_DOCSIDE_URL } from '../utils/doctorPanelUrls';
+import { mapFeedReviewToRaviReview } from '../utils/mapFeedReviewToRavi';
+import { formatSelectedDateLabel } from '../utils/normalizeNotification';
 import {
   DsButton,
   DsCard,
   DsSectionHeader,
-  DsTaskCard,
   DsTimeline,
   DsTimelineItem,
+  DsTaskCard,
   DsBadge,
   ds,
 } from '../designSystem';
 import { DoctorHomeFeedItem, DoctorHomeFeedReview } from '../types/feed';
 import { sendDoctorHomeEvent } from '../utils/analytics';
+import { appendUserIdToUrl } from '../utils/iframeUrl';
 import { getAppointmentTimelineStatuses } from '../utils/timelineStatus';
+import { FeedActionsSection } from './feedActionsSection';
+import { NotificationsSection } from './notificationsSection';
 
 
 const PillButton = ({ children }: { children: string }) => (
@@ -42,29 +42,20 @@ const AppointmentsFeedItem = ({
   data: { items: UpcomingAppointment[]; todayCount: number | null };
 }) => {
   const userId = useUserInfoStore(state => state.info?.id);
-  const router = useRouter();
-  const statuses = getAppointmentTimelineStatuses(data.items);
+  const selectedDate = useSelectedDateStore(state => state.selectedDate);
+  const selectedMoment = moment(selectedDate, 'YYYY-MM-DD');
+  const isToday = selectedMoment.isSame(moment(), 'day');
+  const sectionTitle = isToday
+    ? 'برنامه امروز'
+    : `برنامه ${selectedMoment.clone().locale('fa').format('jD jMMMM')}`;
+  const statuses = getAppointmentTimelineStatuses(data.items, selectedDate);
 
   const allSheet = useSheetRoute('appointments-all');
-  const detailSheet = useSheetRoute('appointment-detail');
-
-  // ID نوبت انتخاب‌شده از URL خونده میشه
-  const apptId = router.query['appt-id'];
-  const apptIdStr = Array.isArray(apptId) ? apptId[0] : (apptId ?? '');
-  const selectedAppointment = apptIdStr
-    ? (data.items.find(a => String(a.book_id) === apptIdStr) ?? null)
-    : null;
-
-  // آخرین نوبت رو نگه میداره تا انیمیشن close با محتوا پر بشه
-  const lastApptRef = useRef<UpcomingAppointment | null>(null);
-  if (detailSheet.open && selectedAppointment) {
-    lastApptRef.current = selectedAppointment;
-  }
 
   return (
     <section>
       <DsSectionHeader
-        title="برنامه امروز"
+        title={sectionTitle}
         subtitle={
           data.todayCount != null
             ? `${data.todayCount.toLocaleString('fa-IR')} نوبت`
@@ -77,31 +68,17 @@ const AppointmentsFeedItem = ({
       />
 
       <DsDrawer
-        open={allSheet.open}
-        onOpenChange={o => { if (!o) allSheet.closeSheet(); }}
-        title={
-          data.todayCount != null
-            ? `برنامه امروز · ${data.todayCount.toLocaleString('fa-IR')} نوبت`
-            : 'برنامه امروز'
-        }
-        description="لیست نوبت‌های امروز"
+        {...sheetDrawerProps(allSheet)}
+        description="لیست نوبت‌ها"
+        fullHeight
+        className="!p-0"
       >
-        <AllAppointmentsDrawerContent
-          items={data.items}
-          todayCount={data.todayCount}
-          onSelectAppointment={id => detailSheet.openSheet({ 'appt-id': id })}
-        />
-      </DsDrawer>
-
-      <DsDrawer
-        open={detailSheet.open}
-        onOpenChange={o => { if (!o) detailSheet.closeSheet(); }}
-        title="جزئیات نوبت"
-        description="اطلاعات بیمار و نوبت"
-        level={1}
-      >
-        {(selectedAppointment ?? lastApptRef.current) && (
-          <AppointmentDetailContent appointment={(selectedAppointment ?? lastApptRef.current)!} />
+        {allSheet.open && (
+          <iframe
+            src={appendUserIdToUrl('https://opium-dashboard.paziresh24.com/book-list/', userId)}
+            title="لیست نوبت‌ها"
+            className="min-h-0 w-full flex-1 border-0"
+          />
         )}
       </DsDrawer>
 
@@ -115,7 +92,7 @@ const AppointmentsFeedItem = ({
             <DsTaskCard
               onClick={() => {
                 sendDoctorHomeEvent(userId, 'appointments_see_all');
-                detailSheet.openSheet({ 'appt-id': String(appointment.book_id) });
+                allSheet.openSheet();
               }}
               title={appointment.patient_name}
               meta={[appointment.center_name, appointment.service_name].filter(Boolean).join(' · ')}
@@ -135,7 +112,7 @@ const AppointmentsFeedItem = ({
                 </div>
               }
             >
-              {statuses[index] === 'current' && <PillButton>نوبت بعدی</PillButton>}
+              {isToday && statuses[index] === 'current' && <PillButton>نوبت بعدی</PillButton>}
             </DsTaskCard>
           </DsTimelineItem>
         ))}
@@ -149,36 +126,20 @@ const ReviewsFeedItem = ({
 }: {
   data: { items: DoctorHomeFeedReview[]; slug?: string; doctorUserId?: string };
 }) => {
-  const userId = useUserInfoStore(state => state.info?.id);
-  const router = useRouter();
+  const user = useUserInfoStore(state => state.info);
+  const userId = user?.id;
+  const selectedDate = useSelectedDateStore(state => state.selectedDate);
+  const selectedDateLabel = formatSelectedDateLabel(selectedDate);
 
   const allSheet = useSheetRoute('reviews-all');
-  const detailSheet = useSheetRoute('review-detail');
 
-  // نگه‌داشتن آبجکت نظرهای انتخاب‌شده (از فید یا از لیست صفحه‌بندی‌شده) برای resolve کردن detail
-  const reviewsByIdRef = useRef<Record<string, DoctorHomeFeedReview>>({});
-  data.items.forEach(r => { if (r.id != null) reviewsByIdRef.current[String(r.id)] = r; });
-
-  const selectReview = (review: DoctorHomeFeedReview) => {
-    if (review.id == null) return;
-    reviewsByIdRef.current[String(review.id)] = review;
-    detailSheet.openSheet({ 'review-id': String(review.id) });
-  };
-
-  const reviewId = router.query['review-id'];
-  const reviewIdStr = Array.isArray(reviewId) ? reviewId[0] : (reviewId ?? '');
-  const selectedReview = reviewIdStr ? (reviewsByIdRef.current[reviewIdStr] ?? null) : null;
-
-  const lastReviewRef = useRef<DoctorHomeFeedReview | null>(null);
-  if (detailSheet.open && selectedReview) {
-    lastReviewRef.current = selectedReview;
-  }
+  if (data.items.length === 0) return null;
 
   return (
     <section>
       <DsSectionHeader
         title="بازخورد بیماران"
-        subtitle={data.items.length > 0 ? `${data.items.length.toLocaleString('fa-IR')} نظر بی‌پاسخ` : undefined}
+        subtitle={`${data.items.length.toLocaleString('fa-IR')} نظر بی‌پاسخ · ${selectedDateLabel}`}
         onPress={() => {
           sendDoctorHomeEvent(userId, 'reviews_see_all');
           allSheet.openSheet();
@@ -186,156 +147,31 @@ const ReviewsFeedItem = ({
       />
 
       <DsDrawer
-        open={allSheet.open}
-        onOpenChange={o => { if (!o) allSheet.closeSheet(); }}
+        {...sheetDrawerProps(allSheet)}
         title="بازخورد بیماران"
-        description="نظرات اخیر بیماران"
+        description="نظرات بیماران"
+        fullHeight
+        className="!p-0"
       >
-        <PaginatedReviewsList slug={data.slug} onSelectReview={selectReview} />
-      </DsDrawer>
-
-      <DsDrawer
-        open={detailSheet.open}
-        onOpenChange={o => { if (!o) detailSheet.closeSheet(); }}
-        title="نظر بیمار"
-        description="جزئیات نظر"
-        level={1}
-      >
-        {(selectedReview ?? lastReviewRef.current) && (
-          <ReviewDetailContent
-            review={(selectedReview ?? lastReviewRef.current)!}
-            slug={data.slug}
-            doctorUserId={data.doctorUserId}
+        {allSheet.open && (
+          <iframe
+            src={appendUserIdToUrl(RAVI_DOCSIDE_URL, userId)}
+            title="راوی؛ نظرات بیماران"
+            className="min-h-0 w-full flex-1 border-0"
           />
         )}
       </DsDrawer>
 
-      {data.items.length > 0 ? (
-        <div className="space-y-3">
-          {data.items.map((review, index) => {
-            const description = removeHtmlTagInString(String(review.description ?? '')).trim();
-
-            return (
-              <div
-                key={review.id ?? index}
-                role="button"
-                onClick={() => {
-                  sendDoctorHomeEvent(userId, 'reviews_see_all');
-                  selectReview(review);
-                }}
-                className={classNames(ds.radius.card, 'cursor-pointer space-y-2 border border-slate-100 bg-white p-4 shadow-sm transition-colors hover:bg-slate-50')}
-              >
-                <ReviewHeader review={review} />
-                <p className={classNames(ds.type.cardBody, 'line-clamp-2 leading-6 text-slate-700')}>
-                  {description || 'بدون متن'}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <DsCard className="text-center !shadow-sm" padding="lg">
-          <p className={ds.type.cardBody}>به همه‌ی نظرهای جدید پاسخ داده‌اید ✓</p>
-          <div className="mt-3">
-            <DsButton variant="ghost" onClick={() => allSheet.openSheet()}>مشاهده همه نظرها</DsButton>
-          </div>
-        </DsCard>
-      )}
-    </section>
-  );
-};
-
-const FeedOnlineVisit = ({
-  userCenterId,
-  hasOnlineVisitCenter,
-}: {
-  userCenterId?: string;
-  hasOnlineVisitCenter: boolean;
-}) => {
-  const userId = useUserInfoStore(state => state.info?.id);
-  const { data, isLoading } = useOnlineVisitServices(userCenterId);
-  const toggleMutation = useToggleOnlineVisit();
-  const [isActive, setIsActive] = useState(false);
-
-  const activationSheet = useSheetRoute('online-visit-activation');
-
-  useEffect(() => {
-    setIsActive(!!data?.data?.some(item => item.active_booking));
-  }, [data]);
-
-  const handleToggle = async (checked: boolean) => {
-    if (!userCenterId || toggleMutation.isLoading) return;
-    setIsActive(checked);
-    try {
-      await toggleMutation.mutateAsync({
-        user_center_id: userCenterId,
-        can_booking: checked ? '1' : '0',
-      });
-      sendDoctorHomeEvent(userId, 'online_visit_toggle', { is_on: checked });
-    } catch {
-      setIsActive(!checked);
-    }
-  };
-
-  if (!hasOnlineVisitCenter) {
-    return (
-      <section>
-        <DsSectionHeader title="اقدامات" />
-        <DsDrawer
-          open={activationSheet.open}
-          onOpenChange={o => { if (!o) activationSheet.closeSheet(); }}
-          title="فعال‌سازی ویزیت آنلاین"
-          description="راهنمای فعال‌سازی"
-        >
-          <div className="flex flex-col items-center gap-4 px-4 pb-10 pt-6 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <ChatIcon className="h-7 w-7" />
-            </div>
-            <div>
-              <p className="text-base font-semibold text-slate-800">ویزیت آنلاین</p>
-              <p className={classNames(ds.type.cardBody, 'mt-2 leading-6')}>
-                برای فعال‌سازی ویزیت آنلاین و دریافت نوبت از بیماران، باید ابتدا پروفایل خود را در پنل پزشکی پاذیرش۲۴ تکمیل کنید.
-              </p>
-            </div>
-          </div>
-        </DsDrawer>
-        <DsTaskCard
-          title="فعال‌سازی ویزیت آنلاین"
-          meta="بیماران بتوانند نوبت آنلاین بگیرند"
-          onClick={() => activationSheet.openSheet()}
-          trailing={
-            <DsButton variant="primary" onClick={() => activationSheet.openSheet()}>
-              شروع
-            </DsButton>
-          }
-        />
-      </section>
-    );
-  }
-
-  return (
-    <section>
-      <DsSectionHeader title="اقدامات" />
-      <DsCard padding="md" className="!shadow-sm">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <ChatIcon className="h-5 w-5" />
-            </div>
-            <div>
-              <p className={ds.type.cardTitle}>ویزیت آنلاین</p>
-              <p className={classNames(ds.type.cardBody, 'mt-0.5')}>
-                {isLoading ? 'بررسی…' : isActive ? 'فعال — نوبت باز است' : 'غیرفعال'}
-              </p>
-            </div>
-          </div>
-          <Switch
-            checked={isActive}
-            onChange={e => handleToggle(e.target.checked)}
-            disabled={isLoading || toggleMutation.isLoading}
+      <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
+        {data.items.map((review, index) => (
+          <RaviCard
+            key={review.id ?? index}
+            review={mapFeedReviewToRaviReview(review)}
+            doctorSlug={data.slug}
+            doctorUserId={data.doctorUserId}
           />
-        </div>
-      </DsCard>
+        ))}
+      </div>
     </section>
   );
 };
@@ -351,46 +187,15 @@ export const FeedItem = ({ item }: FeedItemProps) => {
     case 'stats':
       return null;
 
+    case 'actions':
+      return <FeedActionsSection onlineVisit={item.data.onlineVisit} />;
+
     case 'online_visit':
-      return <FeedOnlineVisit {...item.data} />;
+      return <FeedActionsSection onlineVisit={item.data} />;
 
     case 'alert':
-      return (
-        <section>
-          <DsSectionHeader title="اعلان‌ها" />
-          <DsTaskCard
-            title={item.data.title ?? 'اعلان جدید'}
-            meta={item.data.description}
-            onClick={() => sendDoctorHomeEvent(userId, 'notification_click')}
-            trailing={<BellIcon className="h-5 w-5 text-amber-500" />}
-          />
-        </section>
-      );
-
     case 'alerts':
-      return (
-        <section>
-          <DsSectionHeader title="اعلان‌ها" />
-          <DsCard padding="md" className={classNames(ds.surface.warningSoft, '!shadow-sm')}>
-            <div className="mb-3 flex items-center gap-2">
-              <BellIcon className="h-5 w-5 text-amber-600" />
-              <p className={ds.type.cardTitle}>
-                {item.data.items.length.toLocaleString('fa-IR')} پیام جدید
-              </p>
-            </div>
-            <ul className="space-y-2">
-              {item.data.items.slice(0, 3).map((alert, index) => (
-                <li key={index} className="rounded-lg bg-white px-3 py-2.5">
-                  <p className={ds.type.cardTitle}>{alert.title}</p>
-                  {alert.description && (
-                    <p className={classNames(ds.type.caption, 'mt-0.5 line-clamp-2')}>{alert.description}</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </DsCard>
-        </section>
-      );
+      return <NotificationsSection items={item.type === 'alerts' ? item.data.items : [item.data]} />;
 
     case 'appointments_list':
       return <AppointmentsFeedItem data={item.data} />;

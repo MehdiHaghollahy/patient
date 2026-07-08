@@ -16,13 +16,16 @@ import { prefetchOneApp } from '@/modules/hamdast/utils/prefetchOneApp';
 import { useNotificationPermission } from '@/common/hooks/useNotificationPermission';
 import { useUserInfoStore } from '@/modules/login/store/userInfo';
 import { useQueryClient } from '@tanstack/react-query';
+import { DoctorViewSwap, useDoctorViewSwapActive } from '@/modules/doctorHome';
+import { ds } from '@/modules/doctorHome/designSystem/tokens';
 
 const Page = () => {
   const queryClient = useQueryClient();
   const { handleOpen, handleClose, modalProps } = useModal();
   const [app, setApp] = useState<string>('');
+  const swapActive = useDoctorViewSwapActive();
   const { isResolving, shouldShowLauncher } = useLauncherPageAccess();
-  const info = useUserInfoStore(state => state.info)
+  const info = useUserInfoStore(state => state.info);
   const { isSupported, hasPermission, showModal, openModal, closeModal, checkPermission } = useNotificationPermission();
 
   useEffect(() => {
@@ -34,12 +37,10 @@ const Page = () => {
   };
 
   useEffect(() => {
-
     if (isSupported && !hasPermission && info?.is_doctor) {
       openModal();
     }
-  }, [isSupported, hasPermission, info])
-
+  }, [isSupported, hasPermission, info]);
 
   return (
     <>
@@ -53,23 +54,29 @@ const Page = () => {
         onClose={closeModal}
         onSuccess={handleSuccess}
       />
-      {isResolving && (
-        <div className="flex min-h-[50vh] flex-grow items-center justify-center">
-          <Loading />
-        </div>
-      )}
-      {!isResolving && shouldShowLauncher && (
-        <GlobalContextsProvider>
-          <LauncherMain
-            onAction={action => {
-              if (action.action === 'OPEN_APP') {
-                void prefetchOneApp(queryClient, { appKey: action.appKey, pageKey: 'launcher' }, 0);
-                setApp(action.appKey);
-                handleOpen();
-              }
-            }}
-          />
-        </GlobalContextsProvider>
+      {swapActive ? (
+        <DoctorViewSwap />
+      ) : (
+        <>
+          {isResolving && (
+            <div className="flex min-h-[50vh] flex-grow items-center justify-center">
+              <Loading />
+            </div>
+          )}
+          {!isResolving && shouldShowLauncher && (
+            <GlobalContextsProvider>
+              <LauncherMain
+                onAction={action => {
+                  if (action.action === 'OPEN_APP') {
+                    void prefetchOneApp(queryClient, { appKey: action.appKey, pageKey: 'launcher' }, 0);
+                    setApp(action.appKey);
+                    handleOpen();
+                  }
+                }}
+              />
+            </GlobalContextsProvider>
+          )}
+        </>
       )}
     </>
   );
@@ -77,7 +84,7 @@ const Page = () => {
 
 Page.getLayout = function getLayout(page: ReactElement) {
   return (
-    <LayoutWithHeaderAndFooter {...page.props.config} className="bg-[#F2F3F5]" shouldShowPromoteApp={false} showFooter={false}>
+    <LayoutWithHeaderAndFooter {...page.props.config} className={ds.surface.page} shouldShowPromoteApp={false} showFooter={false}>
       {page}
     </LayoutWithHeaderAndFooter>
   );

@@ -3,6 +3,7 @@ import { UpcomingAppointment } from '../apis/upcomingAppointments';
 export type DoctorHomeFeedItemType =
   | 'stats'
   | 'online_visit'
+  | 'actions'
   | 'alert'
   | 'alerts'
   | 'appointments_list'
@@ -27,8 +28,11 @@ export interface DoctorHomeFeedStats {
 }
 
 export interface DoctorHomeFeedAlert {
+  id?: string | number;
   title?: string;
   description?: string;
+  sender?: string;
+  created_at?: string;
 }
 
 export interface DoctorHomeFeedReview {
@@ -47,6 +51,11 @@ export interface DoctorHomeFeedReview {
 
 export type DoctorHomeFeedItem =
   | { id: string; type: 'stats'; data: DoctorHomeFeedStats }
+  | {
+      id: string;
+      type: 'actions';
+      data: { onlineVisit?: { userCenterId?: string; hasOnlineVisitCenter: boolean } };
+    }
   | {
       id: string;
       type: 'online_visit';

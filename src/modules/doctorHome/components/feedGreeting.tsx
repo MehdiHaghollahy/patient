@@ -2,8 +2,7 @@ import { convertLongToCompactNumber } from '@/common/utils/convertLongToCompactN
 import classNames from '@/common/utils/classNames';
 import { useUserInfoStore } from '@/modules/login/store/userInfo';
 import moment from 'jalali-moment';
-import { useRouter } from 'next/router';
-import { useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   DsDateStrip,
   DsInsightCarousel,
@@ -11,18 +10,24 @@ import {
 } from '../designSystem';
 import type { DsDateStripRef } from '../designSystem';
 import { HOLIDAY_YEAR_END, HOLIDAY_YEAR_START, useHolidays } from '../apis/holidays';
-import { UpcomingAppointment } from '../apis/upcomingAppointments';
-import { DoctorHomeFeedReview, DoctorHomeFeedStats } from '../types/feed';
+import { getVacationsOnDate, useDoctorVacations } from '../apis/vacations';
+import { useDoctorWalletBalance } from '../apis/walletBalance';
+import { DoctorHomeFeedStats } from '../types/feed';
 import { sendDoctorHomeEvent } from '../utils/analytics';
+import { appendUserIdToUrl } from '../utils/iframeUrl';
+import { CenterStrip } from './centerStrip';
 import { useSelectedDateStore } from '../store/selectedDate';
+import { useSelectedCenterStore } from '../store/selectedCenter';
+import { getDoctorCenterOptions, getVacationCenterTargets } from '../utils/centers';
+import { RAVI_DOCSIDE_URL } from '../utils/doctorPanelUrls';
+import { useWalletBalanceVisibilityStore } from '../store/walletBalanceVisibility';
 import { DsDrawer } from './DsDrawer';
-import { AllAppointmentsDrawerContent, AppointmentDetailContent, PaginatedReviewsList, ReviewDetailContent } from './feedDrawerContents';
-import { useSheetRoute } from '../hooks/useSheetRoute';
+import { sheetDrawerProps, useSheetRoute } from '../hooks/useSheetRoute';
+import { AppointmentsCountRow } from './appointmentsCountRow';
 
 interface FeedGreetingProps {
   stats?: DoctorHomeFeedStats;
-  appointments?: { items: UpcomingAppointment[]; todayCount: number | null };
-  reviews?: { items: DoctorHomeFeedReview[]; slug?: string; doctorUserId?: string };
+  notificationDateSet?: Set<string>;
   className?: string;
 }
 
@@ -48,54 +53,55 @@ const MetricDrawerContent = ({
   </div>
 );
 
-export const FeedGreeting = ({ stats, appointments, reviews, className }: FeedGreetingProps) => {
+export const FeedGreeting = ({ stats, notificationDateSet, className }: FeedGreetingProps) => {
   const stripRef = useRef<DsDateStripRef>(null);
   const user = useUserInfoStore(state => state.info);
   const userId = user?.id;
   const selectedDate = useSelectedDateStore(s => s.selectedDate);
+  const selectedCenterId = useSelectedCenterStore(s => s.selectedCenterId);
+  const { data: walletBalance, isLoading: isWalletLoading } = useDoctorWalletBalance(user, !!user?.id, selectedCenterId);
+  const isWalletVisible = useWalletBalanceVisibilityStore(state => state.isVisible);
+  const isWalletHydrated = useWalletBalanceVisibilityStore(state => state.hydrated);
+  const toggleWalletVisibility = useWalletBalanceVisibilityStore(state => state.toggle);
+  const hydrateWalletVisibility = useWalletBalanceVisibilityStore(state => state.hydrate);
   const selectedMoment = moment(selectedDate, 'YYYY-MM-DD');
   const isToday = selectedMoment.isSame(moment(), 'day');
   const { data: holidays } = useHolidays(HOLIDAY_YEAR_START, HOLIDAY_YEAR_END);
+  const vacationCenterTargets = useMemo(() => getVacationCenterTargets(user ?? undefined), [user]);
+  const centerNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    getDoctorCenterOptions(user).forEach(option => {
+      if (option.id) map.set(option.id, option.name);
+    });
+    return map;
+  }, [user]);
+  const { vacations } = useDoctorVacations(vacationCenterTargets, selectedDate, selectedCenterId);
   const selectedDayHoliday = (holidays ?? []).find(h => h.date === selectedDate);
   const holidayEvents = selectedDayHoliday?.events ?? [];
   const allEvents = holidayEvents.filter(e => e.is_holiday);
+  const vacationEvents = useMemo(
+    () =>
+      getVacationsOnDate(vacations, selectedDate, {
+        selectedCenterId,
+        getCenterName: id => centerNameById.get(id) ?? 'مرکز',
+      }),
+    [vacations, selectedDate, selectedCenterId, centerNameById],
+  );
   const dateLabel = selectedMoment.clone().locale('fa').format('dddd، jD jMMMM');
   const appointmentDayLabel = isToday ? 'نوبت امروز' : `نوبت ${selectedMoment.clone().locale('fa').format('jD jMMMM')}`;
-  const appointmentSubLabel = isToday ? 'مراجعین امروز' : `مراجعین ${selectedMoment.clone().locale('fa').format('dddd')}`;
+  const walletFormatted =
+    walletBalance != null ? Math.round(walletBalance / 10).toLocaleString('fa-IR') : null;
 
-  const router = useRouter();
+  useEffect(() => {
+    hydrateWalletVisibility();
+  }, [hydrateWalletVisibility]);
+
   const apptSheet = useSheetRoute('stat-appointments');
-  const detailSheet = useSheetRoute('stat-appointment-detail');
   const reviewsSheet = useSheetRoute('stat-reviews');
-  const reviewDetailSheet = useSheetRoute('stat-review-detail');
+  const walletSheet = useSheetRoute('stat-wallet');
   const performanceSheet = useSheetRoute('stat-performance');
   const pageViewSheet = useSheetRoute('stat-pageview');
-
-  // نوبت انتخاب‌شده برای مودال جزئیات از URL خونده میشه
-  const apptId = router.query['appt-id'];
-  const apptIdStr = Array.isArray(apptId) ? apptId[0] : (apptId ?? '');
-  const selectedAppointment = apptIdStr
-    ? (appointments?.items.find(a => String(a.book_id) === apptIdStr) ?? null)
-    : null;
-  const lastApptRef = useRef<UpcomingAppointment | null>(null);
-  if (detailSheet.open && selectedAppointment) {
-    lastApptRef.current = selectedAppointment;
-  }
-
-  // نظر انتخاب‌شده برای مودال جزئیات نظر — از ref که آبجکت نظرها رو نگه می‌داره
-  const reviewsByIdRef = useRef<Record<string, DoctorHomeFeedReview>>({});
-  const selectReview = (review: DoctorHomeFeedReview) => {
-    if (review.id == null) return;
-    reviewsByIdRef.current[String(review.id)] = review;
-    reviewDetailSheet.openSheet({ 'review-id': String(review.id) });
-  };
-  const reviewId = router.query['review-id'];
-  const reviewIdStr = Array.isArray(reviewId) ? reviewId[0] : (reviewId ?? '');
-  const selectedReview = reviewIdStr ? (reviewsByIdRef.current[reviewIdStr] ?? null) : null;
-  const lastReviewRef = useRef<DoctorHomeFeedReview | null>(null);
-  if (reviewDetailSheet.open && selectedReview) {
-    lastReviewRef.current = selectedReview;
-  }
+  const vacationSheet = useSheetRoute('vacation');
 
   return (
     <header className={classNames('space-y-5', className)}>
@@ -121,12 +127,13 @@ export const FeedGreeting = ({ stats, appointments, reviews, className }: FeedGr
         </div>
       </div>
 
-      <DsDateStrip ref={stripRef} />
+      <DsDateStrip ref={stripRef} markedDates={notificationDateSet} />
+      <CenterStrip />
 
-      {allEvents.length > 0 && (
+      {(allEvents.length > 0 || vacationEvents.length > 0) && (
         <div className="flex flex-col gap-1">
           {allEvents.map((event, i) => (
-            <div key={i} className={classNames('flex items-start gap-2 rounded-xl px-3 py-2', event.is_holiday ? 'bg-red-50' : 'bg-slate-50')}>
+            <div key={`holiday-${i}`} className={classNames('flex items-start gap-2 rounded-xl px-3 py-2', event.is_holiday ? 'bg-red-50' : 'bg-slate-50')}>
               <span className={classNames('mt-1 h-1.5 w-1.5 shrink-0 rounded-full', event.is_holiday ? 'bg-red-400' : 'bg-slate-400')} />
               <div className="flex flex-col gap-0.5">
                 <span className={classNames('text-xs font-medium', event.is_holiday ? 'text-red-500' : 'text-slate-600')}>{event.description}</span>
@@ -136,38 +143,45 @@ export const FeedGreeting = ({ stats, appointments, reviews, className }: FeedGr
               </div>
             </div>
           ))}
+          {vacationEvents.map((event, i) => (
+            <button
+              key={`vacation-${i}`}
+              type="button"
+              onClick={() => vacationSheet.openSheet()}
+              className="flex w-full items-start gap-2 rounded-xl bg-red-50 px-3 py-2 text-right transition-colors active:bg-red-100"
+            >
+              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs font-medium text-red-500">{event.description}</span>
+                {event.additional_description && (
+                  <span className="text-[11px] text-slate-400">{event.additional_description}</span>
+                )}
+              </div>
+            </button>
+          ))}
         </div>
       )}
 
       {stats && (
         <div>
-          <h2 className={classNames(ds.type.section, 'mb-3')}>خلاصه عملکرد</h2>
           <DsInsightCarousel
+            header={
+              <AppointmentsCountRow
+                title={appointmentDayLabel}
+                count={stats.todayAppointmentsCount}
+                isLoading={stats.isTodayCountLoading && stats.todayAppointmentsCount == null}
+                userId={userId}
+                onPress={() => apptSheet.openSheet()}
+              />
+            }
             items={[
-              {
-                icon: (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
-                    <rect x="3" y="4" width="18" height="18" rx="2" />
-                    <path d="M16 2v4M8 2v4M3 10h18" strokeLinecap="round" />
-                  </svg>
-                ),
-                title: appointmentDayLabel,
-                description: appointmentSubLabel,
-                value: stats.todayAppointmentsCount != null ? stats.todayAppointmentsCount.toLocaleString('fa-IR') : null,
-                tint: ds.surface.primaryTint,
-                isLoading: stats.isTodayCountLoading && stats.todayAppointmentsCount == null,
-                onPress: () => {
-                  sendDoctorHomeEvent(userId, 'stat_appointments', { count: stats.todayAppointmentsCount });
-                  apptSheet.openSheet();
-                },
-              },
               {
                 icon: (
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
                     <path d="M12 20V10M18 20V4M6 20v-4" strokeLinecap="round" />
                   </svg>
                 ),
-                title: 'امتیاز شما',
+                title: 'امتیاز',
                 description: 'عملکرد در سنجه',
                 value: stats.performanceScore ?? null,
                 tint: ds.surface.primaryTint,
@@ -195,12 +209,35 @@ export const FeedGreeting = ({ stats, appointments, reviews, className }: FeedGr
               },
               {
                 icon: (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5 text-emerald-600">
+                    <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h13A2.5 2.5 0 0 1 21 7.5v9A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5v-9Z" />
+                    <path d="M16.5 12h4" strokeLinecap="round" />
+                    <circle cx="16.5" cy="12" r="1.25" fill="currentColor" stroke="none" />
+                  </svg>
+                ),
+                title: 'کیف پول',
+                description: 'تومان',
+                value: isWalletHydrated ? walletFormatted : null,
+                hiddenValue: '••••••',
+                tint: 'bg-emerald-50',
+                isLoading: isWalletLoading || !isWalletHydrated,
+                onPress: () => {
+                  sendDoctorHomeEvent(userId, 'stat_wallet', { balance: walletBalance });
+                  walletSheet.openSheet();
+                },
+                visibilityToggle: {
+                  isVisible: isWalletVisible,
+                  onToggle: toggleWalletVisibility,
+                },
+              },
+              {
+                icon: (
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                     <circle cx="12" cy="12" r="3" />
                   </svg>
                 ),
-                title: 'بازدید صفحه',
+                title: 'پیج ویو',
                 description: 'بازدید پروفایل',
                 value: stats.pageViewCount != null ? convertLongToCompactNumber(stats.pageViewCount) : null,
                 tint: ds.surface.secondarySoft,
@@ -216,80 +253,70 @@ export const FeedGreeting = ({ stats, appointments, reviews, className }: FeedGr
       )}
 
       <DsDrawer
-        open={apptSheet.open}
-        onOpenChange={o => { if (!o) apptSheet.closeSheet(); }}
-        title={appointments?.todayCount != null ? `برنامه امروز · ${appointments.todayCount.toLocaleString('fa-IR')} نوبت` : 'برنامه امروز'}
-        description="لیست نوبت‌های امروز"
+        {...sheetDrawerProps(apptSheet)}
+        description="لیست نوبت‌ها"
+        fullHeight
+        className="!p-0"
       >
-        {appointments ? (
-          <AllAppointmentsDrawerContent
-            items={appointments.items}
-            todayCount={appointments.todayCount}
-            onSelectAppointment={id => detailSheet.openSheet({ 'appt-id': id })}
-          />
-        ) : (
-          <div className="px-4 pb-8 pt-4">
-            <p className={classNames(ds.type.caption, 'text-center')}>اطلاعات نوبت‌ها در حال بارگذاری است</p>
-          </div>
-        )}
-      </DsDrawer>
-
-      <DsDrawer
-        open={detailSheet.open}
-        onOpenChange={o => { if (!o) detailSheet.closeSheet(); }}
-        title="جزئیات نوبت"
-        description="اطلاعات بیمار و نوبت"
-        level={1}
-      >
-        {(selectedAppointment ?? lastApptRef.current) && (
-          <AppointmentDetailContent appointment={(selectedAppointment ?? lastApptRef.current)!} />
-        )}
-      </DsDrawer>
-
-      <DsDrawer
-        open={reviewsSheet.open}
-        onOpenChange={o => { if (!o) reviewsSheet.closeSheet(); }}
-        title="بازخورد بیماران"
-        description="نظرات اخیر بیماران"
-      >
-        <PaginatedReviewsList slug={reviews?.slug} onSelectReview={selectReview} />
-      </DsDrawer>
-
-      <DsDrawer
-        open={reviewDetailSheet.open}
-        onOpenChange={o => { if (!o) reviewDetailSheet.closeSheet(); }}
-        title="جزئیات نظر"
-        description="نظر بیمار و پاسخ شما"
-        level={1}
-      >
-        {(selectedReview ?? lastReviewRef.current) && (
-          <ReviewDetailContent
-            review={(selectedReview ?? lastReviewRef.current)!}
-            slug={reviews?.slug}
-            doctorUserId={reviews?.doctorUserId}
+        {apptSheet.open && (
+          <iframe
+            src={appendUserIdToUrl('https://opium-dashboard.paziresh24.com/book-list/', userId)}
+            title="لیست نوبت‌ها"
+            className="min-h-0 w-full flex-1 border-0"
           />
         )}
       </DsDrawer>
 
       <DsDrawer
-        open={performanceSheet.open}
-        onOpenChange={o => { if (!o) performanceSheet.closeSheet(); }}
+        {...sheetDrawerProps(reviewsSheet)}
+        description="نظرات بیماران"
+        fullHeight
+        className="!p-0"
+      >
+        {reviewsSheet.open && (
+          <iframe
+            src={appendUserIdToUrl(RAVI_DOCSIDE_URL, userId)}
+            title="راوی؛ نظرات بیماران"
+            className="min-h-0 w-full flex-1 border-0"
+          />
+        )}
+      </DsDrawer>
+
+      <DsDrawer
+        {...sheetDrawerProps(walletSheet)}
+        description="کتیبه، مدیریت امور مالی"
+        fullHeight
+        className="!p-0"
+      >
+        {walletSheet.open && (
+          <iframe
+            src={appendUserIdToUrl('https://katibe.paziresh24.com/transactions-search/?', userId)}
+            title="کتیبه، مدیریت امور مالی"
+            className="min-h-0 w-full flex-1 border-0"
+          />
+        )}
+      </DsDrawer>
+
+      <DsDrawer
+        {...sheetDrawerProps(performanceSheet)}
         description="عملکرد من در سنجه"
         fullHeight
         className="!p-0"
       >
         {performanceSheet.open && (
           <iframe
-            src="https://jahannama.paziresh24.com/my-performance/?utm_source=p24portal&utm_medium=internal-link&utm_campaign=sanje-my-performance"
+            src={appendUserIdToUrl(
+              'https://jahannama.paziresh24.com/my-performance/?utm_source=p24portal&utm_medium=internal-link&utm_campaign=sanje-my-performance',
+              userId,
+            )}
             title="عملکرد من در سنجه"
-            className="h-full w-full border-0"
+            className="min-h-0 w-full flex-1 border-0"
           />
         )}
       </DsDrawer>
 
       <DsDrawer
-        open={pageViewSheet.open}
-        onOpenChange={o => { if (!o) pageViewSheet.closeSheet(); }}
+        {...sheetDrawerProps(pageViewSheet)}
         title="بازدید پروفایل"
         description="آمار بازدید"
       >

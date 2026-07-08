@@ -4,6 +4,7 @@ import {
   isDoctorDeviceCached,
   redirectCachedDoctorHome,
 } from '@/common/utils/doctorDeviceCache';
+import { isPatientViewModeStored } from '@/modules/doctorHome/store/viewMode';
 import { useUserInfoStore, UserInfo } from '@/modules/login/store/userInfo';
 import { useFeatureIsOn } from '@growthbook/growthbook-react';
 import { useRouter } from 'next/router';
@@ -31,7 +32,8 @@ export const useDoctorHomeRedirect = () => {
     canRedirectToDoctorHome(customize) &&
     REDIRECT_PATHS.includes(router.pathname) &&
     (launcherAsMainHome || isCachedDoctor) &&
-    (isCachedDoctor || isDoctorUser(user));
+    (isCachedDoctor || isDoctorUser(user)) &&
+    !isPatientViewModeStored();
 
   useEffect(() => {
     if (!growthbook.ready) {

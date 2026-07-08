@@ -1,4 +1,5 @@
 import { isDoctorUser } from '@/common/hooks/useDoctorHomeRedirect';
+import { isDoctorDeviceCached } from '@/common/utils/doctorDeviceCache';
 import { useUserInfoStore } from '@/modules/login/store/userInfo';
 import { useRouter } from 'next/router';
 import { useEffect, useRef } from 'react';
@@ -13,7 +14,8 @@ export const useLauncherPageAccess = () => {
   const doctorProfilePending = useUserInfoStore(state => state.doctorProfilePending);
   const hasRedirected = useRef(false);
 
-  const isResolving = pending;
+  const hasDoctorIdentity = isDoctorDeviceCached() || (isLogin && isDoctorUser(user));
+  const isResolving = pending && !hasDoctorIdentity;
   const isDoctor = isLogin && isDoctorUser(user);
 
   useEffect(() => {
