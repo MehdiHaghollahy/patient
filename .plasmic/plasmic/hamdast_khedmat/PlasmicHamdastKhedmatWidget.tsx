@@ -16,6 +16,7 @@ import * as React from "react";
 import Head from "next/head";
 import Link, { LinkProps } from "next/link";
 import { useRouter } from "next/router";
+import ScrollContainer from "react-indiana-drag-scroll";
 
 import {
   Flex as Flex__,
@@ -197,6 +198,9 @@ function PlasmicHamdastKhedmatWidget__RenderFunc(props: {
 
   const styleTokensClassNames = _useStyleTokens();
 
+  const isMobile = hasVariant(globalVariants, "screen", "mobileOnly");
+  const ScrollContainerComponent = isMobile ? "div" : ScrollContainer;
+
   return (
     <div
       data-plasmic-name={"root"}
@@ -228,7 +232,10 @@ function PlasmicHamdastKhedmatWidget__RenderFunc(props: {
           throw e;
         }
       })() ? (
-        <div className={classNames("all", sty.freeBox__q8Pqw, "no-scroll")}>
+        <ScrollContainerComponent
+          className={classNames("all", sty.freeBox__q8Pqw, isMobile ? "no-scroll" : "")}
+          {...(!isMobile && { hideScrollbars: false })}
+        >
           {(_par => (!_par ? [] : Array.isArray(_par) ? _par : [_par]))(
             (() => {
               try {
@@ -378,7 +385,7 @@ function PlasmicHamdastKhedmatWidget__RenderFunc(props: {
               />
             );
           })}
-        </div>
+        </ScrollContainerComponent>
       ) : null}
       {(() => {
         try {
