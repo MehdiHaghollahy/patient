@@ -12,3 +12,5 @@ export const DoctorLauncherContent = () => {
     </DoctorHomeAppModalProvider>
   );
 };
+
+export default DoctorLauncherContent;

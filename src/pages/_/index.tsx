@@ -25,25 +25,21 @@ const pageLoading = (
   </div>
 );
 
-const DoctorLauncherContent = dynamic(
-  () => import('@/modules/doctorHome/components/doctorLauncherContent').then(m => m.DoctorLauncherContent),
-  { loading: () => pageLoading },
-);
+const DoctorLauncherContent = dynamic(() => import('@/modules/doctorHome/components/doctorLauncherContent'), {
+  loading: () => pageLoading,
+});
 
-const LegacyLauncherSection = dynamic(
-  () => import('./legacyLauncherSection').then(m => m.LegacyLauncherSection),
-  { loading: () => pageLoading },
-);
+const LegacyLauncherSection = dynamic(() => import('./legacyLauncherSection'), {
+  loading: () => pageLoading,
+});
 
-const HamdastAppModal = dynamic(
-  () => import('@/modules/hamdast/components/appModal').then(m => m.HamdastAppModal),
-  { ssr: false },
-);
+const HamdastAppModal = dynamic(() => import('@/modules/hamdast/components/appModal'), {
+  ssr: false,
+});
 
-const AppFrame = dynamic(
-  () => import('@/modules/hamdast/appFrame').then(m => m.AppFrame),
-  { ssr: false },
-);
+const AppFrame = dynamic(() => import('@/modules/hamdast/appFrame'), {
+  ssr: false,
+});
 
 const Page = () => {
   const queryClient = useQueryClient();

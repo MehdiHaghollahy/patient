@@ -283,3 +283,5 @@ export const AppFrame = ({
     </div>
   );
 };
+
+export default AppFrame;

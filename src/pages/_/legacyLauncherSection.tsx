@@ -10,3 +10,5 @@ export const LegacyLauncherSection = ({ onAction }: LegacyLauncherSectionProps) 
     <LauncherMain onAction={onAction} />
   </GlobalContextsProvider>
 );
+
+export default LegacyLauncherSection;
