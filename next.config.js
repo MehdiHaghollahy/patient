@@ -54,7 +54,7 @@ const nextConfig = {
   ],
   compress: true,
   poweredByHeader: false,
-  webpack: (config, { webpack, isServer }) => {
+  webpack: (config, { isServer, dev }) => {
     config.module.rules.push({
       test: [/lib\/.*.tsx?/i],
       sideEffects: false,
@@ -70,6 +70,11 @@ const nextConfig = {
         ...config.resolve.alias,
         '@ant-design/icons/lib/dist$': '@ant-design/icons/lib/icons',
       };
+    }
+
+    // splitChunks فقط در production — در dev کامپایل را خیلی کند می‌کند
+    if (dev) {
+      return config;
     }
 
     // بهینه‌سازی webpack splitChunks
@@ -251,10 +256,14 @@ const nextConfig = {
 
 const moduleExports = () => plugins.reduce((acc, next) => next(acc), nextConfig);
 
-// Sentry as last wrapper (DSN & 1% sample rate in sentry.*.config.ts)
-module.exports = withSentryConfig(moduleExports, {
+const sentryWebpackPluginOptions = {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   authToken: process.env.SENTRY_AUTH_TOKEN,
   silent: !process.env.CI,
-});
+};
+
+// Sentry webpack plugin فقط در production — در dev کامپایل را کند می‌کند
+module.exports = isProduction
+  ? withSentryConfig(moduleExports, sentryWebpackPluginOptions)
+  : moduleExports();

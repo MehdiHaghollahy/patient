@@ -1,7 +1,8 @@
 import Skeleton from '@/common/components/atom/skeleton';
 import classNames from '@/common/utils/classNames';
 import Link from 'next/link';
-import { ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { ReactNode, useCallback, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { useIsomorphicLayoutEffect } from '@/common/hooks/useIsomorphicLayoutEffect';
 import { animated, useSpring } from 'react-spring';
 import { EyeHiddenIcon, EyeVisibleIcon } from '../components/icons';
 import { dsFocusRing, prefersReducedMotion } from '../utils/a11y';
@@ -38,9 +39,9 @@ const MaskedInsightValue = ({
   </span>
 );
 
-const ToggleEyeIcon = ({ visible, prominent = false }: { visible: boolean; prominent?: boolean }) => (
+const ToggleEyeIcon = ({ visible }: { visible: boolean }) => (
   <span key={visible ? 'hide' : 'show'} className={classNames('inline-flex', ds.motion.walletSwap)}>
-    {visible ? <EyeHiddenIcon size={prominent ? 'sm' : 'xs'} /> : <EyeVisibleIcon size={prominent ? 'sm' : 'xs'} />}
+    {visible ? <EyeHiddenIcon size="xs" /> : <EyeVisibleIcon size="xs" />}
   </span>
 );
 
@@ -60,15 +61,14 @@ const InsightVisibilityToggle = ({
       onToggle();
     }}
     className={classNames(
-      'relative z-20 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800',
-      ds.motion.surface,
+      'relative z-20 flex shrink-0 items-center justify-center p-0.5 text-slate-400 hover:text-slate-600',
       ds.motion.press,
       dsFocusRing,
     )}
     aria-label={isVisible ? 'پنهان کردن موجودی' : 'نمایش موجودی'}
     aria-pressed={isVisible}
   >
-    <ToggleEyeIcon visible={isVisible} prominent />
+    <ToggleEyeIcon visible={isVisible} />
   </button>
 );
 
@@ -535,7 +535,7 @@ export const DsInsightCarousel = ({
   });
   const [spring, api] = useSpring(() => ({ pull: 0 }));
 
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const dir = document.documentElement.getAttribute('dir');
     setScrollDir(dir === 'ltr' ? 'ltr' : 'rtl');
   }, []);

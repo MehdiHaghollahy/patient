@@ -2,23 +2,48 @@ import { LayoutWithHeaderAndFooter } from '@/common/components/layouts/layoutWit
 import { withServerUtils } from '@/common/hoc/withServerUtils';
 import { ThemeConfig } from '@/common/hooks/useCustomize';
 import { GetServerSideProps, GetServerSidePropsContext } from 'next';
+import dynamic from 'next/dynamic';
 import { ReactElement, useEffect, useState } from 'react';
-import LauncherMain from '.plasmic/LauncherMain';
-import GlobalContextsProvider from '.plasmic/plasmic/launcher/PlasmicGlobalContextsProvider';
 import Seo from '@/common/components/layouts/seo';
 import useModal from '@/common/hooks/useModal';
 import { NotificationPermissionModal } from '@/common/components/atom/notificationPermissionModal';
 import Loading from '@/common/components/atom/loading';
 import { useLauncherPageAccess } from '@/common/hooks/useLauncherPageAccess';
-import { AppFrame } from '@/modules/hamdast/appFrame';
-import { HamdastAppModal } from '@/modules/hamdast/components/appModal';
 import { prefetchOneApp } from '@/modules/hamdast/utils/prefetchOneApp';
 import { useNotificationPermission } from '@/common/hooks/useNotificationPermission';
 import { useUserInfoStore } from '@/modules/login/store/userInfo';
 import { useQueryClient } from '@tanstack/react-query';
-import { DoctorViewSwitcher, useDoctorViewRouteGuard, useDoctorViewSwapActive, useIsNewDoctorLauncherLoading } from '@/modules/doctorHome';
-import { DoctorLauncherContent } from '@/modules/doctorHome/components/doctorLauncherContent';
+import { DoctorViewSwitcher } from '@/modules/doctorHome/components/doctorViewSwitcher';
+import { useDoctorViewRouteGuard } from '@/modules/doctorHome/hooks/useDoctorViewRouteGuard';
+import { useDoctorViewSwapActive } from '@/modules/doctorHome/hooks/useDoctorViewSwapActive';
+import { useIsNewDoctorLauncherLoading } from '@/modules/doctorHome/hooks/useNewDoctorLauncher';
 import { ds } from '@/modules/doctorHome/designSystem/tokens';
+
+const pageLoading = (
+  <div className="flex min-h-[50vh] flex-grow items-center justify-center">
+    <Loading />
+  </div>
+);
+
+const DoctorLauncherContent = dynamic(
+  () => import('@/modules/doctorHome/components/doctorLauncherContent').then(m => m.DoctorLauncherContent),
+  { loading: () => pageLoading },
+);
+
+const LegacyLauncherSection = dynamic(
+  () => import('./legacyLauncherSection').then(m => m.LegacyLauncherSection),
+  { loading: () => pageLoading },
+);
+
+const HamdastAppModal = dynamic(
+  () => import('@/modules/hamdast/components/appModal').then(m => m.HamdastAppModal),
+  { ssr: false },
+);
+
+const AppFrame = dynamic(
+  () => import('@/modules/hamdast/appFrame').then(m => m.AppFrame),
+  { ssr: false },
+);
 
 const Page = () => {
   const queryClient = useQueryClient();
@@ -80,17 +105,15 @@ const Page = () => {
             </div>
           )}
           {!isResolving && shouldShowLauncher && (
-            <GlobalContextsProvider>
-              <LauncherMain
-                onAction={action => {
-                  if (action.action === 'OPEN_APP') {
-                    void prefetchOneApp(queryClient, { appKey: action.appKey, pageKey: 'launcher' }, 0);
-                    setApp(action.appKey);
-                    handleOpen();
-                  }
-                }}
-              />
-            </GlobalContextsProvider>
+            <LegacyLauncherSection
+              onAction={action => {
+                if (action.action === 'OPEN_APP') {
+                  void prefetchOneApp(queryClient, { appKey: action.appKey, pageKey: 'launcher' }, 0);
+                  setApp(action.appKey);
+                  handleOpen();
+                }
+              }}
+            />
           )}
         </>
       )}

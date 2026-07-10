@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "cross-env NODE_OPTIONS='--inspect' node server.js",
+    "dev": "cross-env node server.js",
+    "dev:turbo": "cross-env TURBO=1 node server.js",
+    "dev:debug": "cross-env NODE_OPTIONS='--inspect' node server.js",
     "build": "node scripts/remove-google-fonts.js && next build",
     "analyze": "cross-env ANALYZE=true SENTRY_LOG_LEVEL=debug next build",
     "start": "next start",

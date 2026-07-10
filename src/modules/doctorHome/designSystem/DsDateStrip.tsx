@@ -1,6 +1,7 @@
 import classNames from '@/common/utils/classNames';
 import moment from 'jalali-moment';
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { useIsomorphicLayoutEffect } from '@/common/hooks/useIsomorphicLayoutEffect';
 import { flushSync } from 'react-dom';
 import { animated, useSpring } from 'react-spring';
 import { HOLIDAY_YEAR_END, HOLIDAY_YEAR_START, useHolidays } from '../apis/holidays';
@@ -116,7 +117,7 @@ export const DsDateStrip = forwardRef<DsDateStripRef, { className?: string; mark
   );
 
   // ── Measure ──────────────────────────────────────────────────────────────
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const measure = () => {
@@ -138,7 +139,7 @@ export const DsDateStrip = forwardRef<DsDateStripRef, { className?: string; mark
   //   cell[BUFFER].left  = BUFFER * cellW
   //   viewport center    = 3.5 * cellW (7 cells wide)
   //   scrollLeft = BUFFER*cellW − 3.5*cellW + 0.5*cellW = (BUFFER − 3)*cellW
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const container = containerRef.current;
     if (!container || cellW === 0) return;
     container.scrollLeft = (BUFFER - 3) * cellW;

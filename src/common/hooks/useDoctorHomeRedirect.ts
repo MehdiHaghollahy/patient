@@ -1,4 +1,5 @@
 import { useClientMounted } from '@/common/hooks/useClientMounted';
+import { useIsomorphicLayoutEffect } from '@/common/hooks/useIsomorphicLayoutEffect';
 import { isMobileViewport } from '@/common/hooks/useResponsive';
 import {
   isDoctorDeviceCached,
@@ -9,7 +10,7 @@ import { isPatientViewModeStored } from '@/modules/doctorHome/store/viewMode';
 import { isSpaPatientView, useSpaPatientViewStore } from '@/modules/doctorHome/utils/spaPatientView';
 import { useUserInfoStore, UserInfo } from '@/modules/login/store/userInfo';
 import { useRouter } from 'next/router';
-import { useEffect, useRef, useLayoutEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { growthbook } from 'src/pages/_app';
 
 export const isDoctorUser = (user: UserInfo) =>
@@ -53,7 +54,7 @@ export const useDoctorHomeRedirect = () => {
   }, [isLogin, isCachedDoctor, router]);
 
   // Cold-load / refresh: hard redirect before paint — mobile only, ignores patient storage.
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (hasRedirected.current) return;
     if (isSpaPatientView()) return;
     if (redirectCachedDoctorHome()) {
@@ -61,7 +62,7 @@ export const useDoctorHomeRedirect = () => {
     }
   }, []);
 
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (isPatientOptOut) {
       hasRedirected.current = false;
       return;

@@ -4,6 +4,7 @@ import Seo from '@/common/components/layouts/seo';
 import { withCSR } from '@/common/hoc/withCsr';
 import { withServerUtils } from '@/common/hoc/withServerUtils';
 import { useDoctorHomeRedirectLoading } from '@/common/hooks/useDoctorHomeRedirectLoading';
+import { useIsomorphicLayoutEffect } from '@/common/hooks/useIsomorphicLayoutEffect';
 import { getServerSideGrowthBookContext } from '@/common/helper/getServerSideGrowthBookContext';
 import { getHost, HeaderBag } from '@/common/utils/getHost';
 import {
@@ -15,7 +16,7 @@ import {
 import { GrowthBook } from '@growthbook/growthbook-react';
 import dynamic from 'next/dynamic';
 import { GetServerSidePropsContext, NextApiRequest } from 'next/types';
-import { ReactElement, useLayoutEffect } from 'react';
+import { ReactElement } from 'react';
 import PlasmicSearch from '.plasmic/plasmic/paziresh_24_search/PlasmicSearch';
 import { useSearchStore } from '@/modules/search/store/search';
 
@@ -35,7 +36,7 @@ const Home = ({ fragmentComponents }: any) => {
 
   useDoctorViewRouteGuard();
 
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     setIsOpenSuggestion(false);
   }, [setIsOpenSuggestion]);
 

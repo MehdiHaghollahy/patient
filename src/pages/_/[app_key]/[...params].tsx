@@ -17,7 +17,8 @@ import { useUserInfoStore } from '@/modules/login/store/userInfo';
 import isEmpty from 'lodash/isEmpty';
 import { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import { useRouter } from 'next/router';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useIsomorphicLayoutEffect } from '@/common/hooks/useIsomorphicLayoutEffect';
 import axios from 'axios';
 import GlobalContextsProvider from '.plasmic/plasmic/launcher/PlasmicGlobalContextsProvider';
 import LauncherProfile from '.plasmic/LauncherProfile';
@@ -89,7 +90,7 @@ const Page = ({ page, app }: any) => {
     setIsAppLoading(false);
   }, [embedSrc]);
 
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (!embedSrc) {
       setIsAppLoading(false);
       return;

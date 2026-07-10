@@ -4,20 +4,14 @@ const { fontFamily } = require('tailwindcss/defaultTheme');
 
 module.exports = {
   content: ['./src/**/*.{js,ts,jsx,tsx}'],
-  purge: {
-    enabled: process.env.NODE_ENV === 'production',
-    content: ['./src/**/*.{js,ts,jsx,tsx}'],
-    options: {
-      safelist: [
-        'rtl',
-        'ltr',
-        'scroll-smooth',
-        'antialiased',
-        'pwa:select-none',
-        'dont-fa-number-font',
-      ],
-    },
-  },
+  safelist: [
+    'rtl',
+    'ltr',
+    'scroll-smooth',
+    'antialiased',
+    'pwa:select-none',
+    'dont-fa-number-font',
+  ],
   theme: {
     extend: {
       screens: {
