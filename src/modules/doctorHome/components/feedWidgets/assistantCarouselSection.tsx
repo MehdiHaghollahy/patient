@@ -16,7 +16,7 @@ export const AssistantCarouselSection = ({
   onOpenApp: (app: HamdastCatalogApp) => void;
   onActivate: (app: HamdastCatalogApp) => void;
 }) => (
-  <div className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-0.5 scrollbar-hide snap-x snap-mandatory">
+  <div className={ds.layout.carouselStripTight}>
     {apps.map(app => {
       const soon = getBadgeLabel(app.badges) === 'به‌زودی';
       const isActive = installedKeys.has(app.app_key);
@@ -29,8 +29,10 @@ export const AssistantCarouselSection = ({
           onClick={() => (soon ? onOpenApp(app) : isActive ? onOpenApp(app) : onActivate(app))}
           className={classNames(
             ds.radius.card,
-            'flex w-[12.5rem] shrink-0 snap-start flex-col border bg-white p-3 text-start shadow-sm',
-            isActive ? 'border-emerald-200/80' : 'border-slate-100',
+            ds.surface.tile,
+            ds.shadow.sm,
+            'flex w-[12.5rem] shrink-0 snap-start flex-col border p-3 text-start',
+            isActive ? ds.surface.activeAccent : 'border-slate-100',
             'transition-[transform,box-shadow] duration-150 ease-out active:scale-[0.98] hover:shadow-md',
           )}
         >
@@ -38,7 +40,8 @@ export const AssistantCarouselSection = ({
           {!soon ? (
             <span
               className={classNames(
-                'mt-2.5 text-xs font-semibold',
+                'mt-2.5',
+                ds.type.badge,
                 isActive ? 'text-slate-500' : ds.type.link,
               )}
             >

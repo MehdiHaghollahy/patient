@@ -1,10 +1,10 @@
 import Skeleton from '@/common/components/atom/skeleton';
-import EyeIcon from '@/common/components/icons/eye';
-import EyeSlashIcon from '@/common/components/icons/eyeSlash';
 import classNames from '@/common/utils/classNames';
 import Link from 'next/link';
-import { ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { animated, useSpring } from 'react-spring';
+import { EyeHiddenIcon, EyeVisibleIcon } from '../components/icons';
+import { dsFocusRing, prefersReducedMotion } from '../utils/a11y';
 import { ds } from './tokens';
 
 const DRAG_CLICK_THRESHOLD = 8;
@@ -18,11 +18,67 @@ const dampenNumber = (value: number, max = 60) => {
 
 const VAUL_SPRING = { tension: 300, friction: 26, mass: 1 };
 
+const MaskedInsightValue = ({
+  visible,
+  value,
+  hiddenValue = '••••••',
+  className,
+}: {
+  visible: boolean;
+  value: string | number | null | undefined;
+  hiddenValue?: string;
+  className?: string;
+}) => (
+  <span
+    key={visible ? `visible-${value ?? ''}` : 'hidden'}
+    className={classNames('inline-block origin-center', ds.motion.walletSwap, className)}
+    aria-hidden={!visible}
+  >
+    {visible ? value : hiddenValue}
+  </span>
+);
+
+const ToggleEyeIcon = ({ visible, prominent = false }: { visible: boolean; prominent?: boolean }) => (
+  <span key={visible ? 'hide' : 'show'} className={classNames('inline-flex', ds.motion.walletSwap)}>
+    {visible ? <EyeHiddenIcon size={prominent ? 'sm' : 'xs'} /> : <EyeVisibleIcon size={prominent ? 'sm' : 'xs'} />}
+  </span>
+);
+
+const InsightVisibilityToggle = ({
+  isVisible,
+  onToggle,
+}: {
+  isVisible: boolean;
+  onToggle: () => void;
+}) => (
+  <button
+    type="button"
+    data-insight-toggle
+    onClick={event => {
+      event.preventDefault();
+      event.stopPropagation();
+      onToggle();
+    }}
+    className={classNames(
+      'relative z-20 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800',
+      ds.motion.surface,
+      ds.motion.press,
+      dsFocusRing,
+    )}
+    aria-label={isVisible ? 'پنهان کردن موجودی' : 'نمایش موجودی'}
+    aria-pressed={isVisible}
+  >
+    <ToggleEyeIcon visible={isVisible} prominent />
+  </button>
+);
+
 export interface DsInsightItem {
   icon: ReactNode;
   title: string;
   description: string;
   value?: string | number | null;
+  valueMax?: number;
+  valueBarClass?: string;
   hiddenValue?: string;
   tint?: string;
   isLoading?: boolean;
@@ -59,95 +115,391 @@ const getScrollMetrics = (el: HTMLElement) => {
   };
 };
 
-const InsightCard = ({ item }: { item: DsInsightItem }) => {
+const parseInsightNumericValue = (value: string | number): number | null => {
+  const num = typeof value === 'number' ? value : Number(String(value).replace(/[^\d.]/g, ''));
+  return Number.isFinite(num) ? num : null;
+};
+
+const BAR_FILL_SPRING = { tension: 70, friction: 16 };
+
+const InsightScaledValue = ({
+  value,
+  max,
+  barClassName,
+  onFillComplete,
+  compact = false,
+}: {
+  value: string | number;
+  max?: number;
+  barClassName?: string;
+  onFillComplete?: () => void;
+  compact?: boolean;
+}) => {
+  const fillCompleteRef = useRef(onFillComplete);
+  const hasCompletedRef = useRef(false);
+  fillCompleteRef.current = onFillComplete;
+
+  const numericValue = parseInsightNumericValue(value);
+  const percent =
+    max != null && numericValue != null
+      ? Math.min(100, Math.max(0, (numericValue / max) * 100))
+      : null;
+  const fillClass = barClassName ?? ds.progress.fill;
+
+  const [{ width }, api] = useSpring(() => ({ width: 0 }));
+
+  useEffect(() => {
+    if (percent == null) return;
+
+    hasCompletedRef.current = false;
+    if (prefersReducedMotion()) {
+      api.set({ width: percent });
+      hasCompletedRef.current = true;
+      fillCompleteRef.current?.();
+      return;
+    }
+
+    api.set({ width: 0 });
+    api.start({
+      to: { width: percent },
+      config: BAR_FILL_SPRING,
+      onRest: ({ finished }) => {
+        if (!finished || hasCompletedRef.current) return;
+        hasCompletedRef.current = true;
+        fillCompleteRef.current?.();
+      },
+    });
+  }, [api, percent, value]);
+
+  return (
+    <div className={classNames('flex flex-col items-end', compact ? 'gap-1' : 'gap-1.5')}>
+      <div className="flex items-baseline leading-none" dir="ltr">
+        <span className={classNames(compact ? 'text-base font-bold tabular-nums text-slate-900' : ds.type.insightValue, 'leading-none')}>
+          {value}
+        </span>
+        {max != null && (
+          <span className={classNames(compact ? 'text-[10px] font-semibold tabular-nums text-slate-300' : ds.type.caption, 'ms-0.5 font-semibold tabular-nums text-slate-300')}>
+            <span className="font-normal text-slate-200">/</span>
+            {max.toLocaleString('fa-IR')}
+          </span>
+        )}
+      </div>
+      {percent != null && (
+        <div
+          className={classNames(compact ? 'h-0.5 w-8' : 'h-1 w-11', 'overflow-hidden rounded-full', ds.progress.track)}
+          aria-hidden
+        >
+          <animated.div
+            className={classNames('h-full rounded-full', fillClass)}
+            style={{ width: width.to(w => `${w}%`) }}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
+const InsightCardGlassFlash = () => (
+  <span className="pointer-events-none absolute inset-0 z-10 overflow-hidden rounded-2xl" aria-hidden>
+    <span className="absolute inset-0 bg-gradient-to-br from-white/0 via-white/30 to-slate-200/15 opacity-95" />
+    <span className="absolute -inset-y-7 -left-[62%] w-[82%] animate-insight-glass-sweep bg-gradient-to-r from-transparent via-white to-transparent opacity-100 mix-blend-screen blur-[2px] motion-reduce:animate-none" />
+    <span className="absolute -inset-y-5 -left-[50%] w-[52%] animate-insight-glass-sweep bg-gradient-to-r from-transparent via-white/95 to-transparent opacity-85 blur-[1px] motion-reduce:animate-none" />
+  </span>
+);
+
+const InsightCard = ({
+  item,
+  fullWidth = false,
+  appearance = 'default',
+  compact = false,
+  shouldIgnorePress,
+}: {
+  item: DsInsightItem;
+  fullWidth?: boolean;
+  appearance?: 'default' | 'workstation';
+  compact?: boolean;
+  shouldIgnorePress?: () => boolean;
+}) => {
   const isValueVisible = !item.visibilityToggle || item.visibilityToggle.isVisible;
-  const displayValue = isValueVisible ? item.value : (item.hiddenValue ?? '••••••');
+  const hiddenValue = item.hiddenValue ?? '••••••';
+  const displayValue = item.value;
   const isWalletCard = !!item.visibilityToggle;
+  const hasScoreBar = item.valueMax != null;
+  const [glassFlash, setGlassFlash] = useState(false);
+  const glassTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const handleBarFillComplete = useCallback(() => {
+    if (!hasScoreBar || prefersReducedMotion()) return;
+    setGlassFlash(true);
+    if (glassTimeoutRef.current) clearTimeout(glassTimeoutRef.current);
+    glassTimeoutRef.current = setTimeout(() => setGlassFlash(false), 900);
+  }, [hasScoreBar]);
+
+  useEffect(() => {
+    if (item.isLoading) {
+      setGlassFlash(false);
+      if (glassTimeoutRef.current) clearTimeout(glassTimeoutRef.current);
+    }
+  }, [item.isLoading]);
+
+  useEffect(
+    () => () => {
+      if (glassTimeoutRef.current) clearTimeout(glassTimeoutRef.current);
+    },
+    [],
+  );
+
+  const isWorkstation = appearance === 'workstation' && fullWidth;
 
   const cardClassName = classNames(
-    ds.radius.card,
-    ds.shadow.card,
-    'flex h-[8.75rem] w-[10.75rem] flex-col border border-slate-100/90 bg-white p-4',
-    'transition-[box-shadow] duration-200 ease-out',
-    item.href && 'hover:shadow-lg',
-    isWalletCard ? 'justify-between' : 'justify-between',
+    isWorkstation
+      ? classNames(ds.workstation.widgetSm, 'min-h-[8rem]')
+      : classNames(ds.radius.card, ds.shadow.sm, ds.surface.card),
+    'relative overflow-hidden',
+    compact
+      ? 'flex w-full items-center gap-2.5 p-2.5'
+      : classNames('flex flex-col justify-between', isWorkstation ? 'p-5' : 'p-4'),
+    !compact && (isWorkstation ? 'min-h-[8rem]' : 'h-[7rem]'),
+    !compact && (fullWidth ? 'w-full' : 'w-[9.25rem]'),
+    'transition-[transform,box-shadow] duration-200 ease-out',
+    (item.href || item.onPress) && 'cursor-pointer hover:-translate-y-px hover:shadow-md active:scale-[0.98]',
+    !isWalletCard && fullWidth && !isWorkstation && !compact && (item.href || item.onPress) && 'hover:shadow-[0_10px_28px_rgba(15,23,42,0.08)]',
+    !isWalletCard && fullWidth && isWorkstation && (item.href || item.onPress) && 'hover:shadow-[0_12px_36px_rgba(15,23,42,0.1)]',
   );
+
+  const iconBoxClass = classNames(compact ? 'h-7 w-7' : 'h-8 w-8', 'shrink-0', ds.icon.containerTile);
+  const iconInnerClass = classNames(ds.icon.color, compact ? '[&>svg]:h-3.5 [&>svg]:w-3.5' : '[&>svg]:h-4 [&>svg]:w-4');
+
+  const getWalletValueClass = (metricCompact: boolean) => {
+    const text = isValueVisible ? String(item.value ?? '') : hiddenValue;
+    const len = text.replace(/[^\d۰-۹]/g, '').length || text.length;
+
+    if (metricCompact) {
+      if (fullWidth) {
+        if (len > 12) return 'text-xs font-bold tabular-nums text-slate-900';
+        if (len > 9) return 'text-sm font-bold tabular-nums text-slate-900';
+        return 'text-base font-bold tabular-nums text-slate-900';
+      }
+      if (len > 10) return 'text-[10px] font-bold tabular-nums text-slate-900';
+      if (len > 8) return 'text-xs font-bold tabular-nums text-slate-900';
+      if (len > 6) return 'text-sm font-bold tabular-nums text-slate-900';
+      return 'text-base font-bold tabular-nums text-slate-900';
+    }
+
+    if (fullWidth) {
+      if (len > 12) return 'text-sm font-bold tabular-nums text-slate-900';
+      if (len > 9) return 'text-base font-bold tabular-nums text-slate-900';
+      return ds.type.insightValue;
+    }
+
+    if (len > 11) return 'text-[11px] font-bold tabular-nums text-slate-900';
+    if (len > 9) return 'text-xs font-bold tabular-nums text-slate-900';
+    if (len > 7) return 'text-sm font-bold tabular-nums text-slate-900';
+    if (len > 5) return 'text-base font-bold tabular-nums text-slate-900';
+    return 'text-lg font-bold tabular-nums text-slate-900';
+  };
+
+  const renderMetricValue = (metricCompact = false) => {
+    if (item.isLoading) {
+      return metricCompact ? (
+        <Skeleton h="1rem" w="2.25rem" rounded="md" />
+      ) : (
+        <div className="flex flex-col items-end gap-1.5">
+          <Skeleton h="1.5rem" w="2.75rem" rounded="md" />
+          {item.valueMax != null ? <Skeleton h="0.25rem" w="2.75rem" rounded="full" /> : null}
+        </div>
+      );
+    }
+
+    if (displayValue == null) return null;
+
+    if (item.valueMax != null) {
+      return (
+        <InsightScaledValue
+          value={displayValue}
+          max={item.valueMax}
+          barClassName={item.valueBarClass}
+          onFillComplete={handleBarFillComplete}
+          compact={metricCompact}
+        />
+      );
+    }
+
+    if (isWalletCard) {
+      return (
+        <span className={classNames(getWalletValueClass(metricCompact), 'block w-full leading-tight tabular-nums')}>
+          <MaskedInsightValue visible={isValueVisible} value={item.value} hiddenValue={hiddenValue} />
+        </span>
+      );
+    }
+
+    return (
+      <span
+        className={classNames(
+          metricCompact ? 'text-base font-bold tabular-nums leading-none text-slate-900' : ds.type.insightValue,
+          'leading-none tabular-nums',
+        )}
+      >
+        {displayValue}
+      </span>
+    );
+  };
+
+  const handleCardPress = useCallback(() => {
+    if (shouldIgnorePress?.()) return;
+    item.onPress?.();
+    item.onClick?.();
+  }, [item, shouldIgnorePress]);
+
+  const handleWalletCardClick = useCallback(
+    (event: MouseEvent<HTMLElement>) => {
+      if ((event.target as HTMLElement).closest('[data-insight-toggle]')) return;
+      if (!item.onPress) return;
+      handleCardPress();
+    },
+    [handleCardPress, item.onPress],
+  );
+
+  const handleWalletCardKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLElement>) => {
+      if (!item.onPress || (event.key !== 'Enter' && event.key !== ' ')) return;
+      if ((event.target as HTMLElement).closest('[data-insight-toggle]')) return;
+      event.preventDefault();
+      handleCardPress();
+    },
+    [handleCardPress, item.onPress],
+  );
+
+  const walletToggle =
+    isWalletCard && item.visibilityToggle ? (
+      <InsightVisibilityToggle
+        isVisible={item.visibilityToggle.isVisible}
+        onToggle={item.visibilityToggle.onToggle}
+      />
+    ) : null;
+
+  const walletFooter = (
+    <div className="min-w-0 text-right">
+      <div className="mb-1 text-end leading-tight" dir="ltr">
+        {item.isLoading ? (
+          <Skeleton h="1.5rem" w="2.75rem" rounded="md" className="ms-auto" />
+        ) : (
+          renderMetricValue(compact)
+        )}
+      </div>
+      <p className={classNames(ds.type.insightTitle, 'truncate')}>{item.title}</p>
+    </div>
+  );
+
+  const insightFooter = (
+    <div className="min-w-0 text-right">
+      <p className={classNames(ds.type.insightTitle, 'truncate')}>{item.title}</p>
+      {item.isLoading ? (
+        <Skeleton h={compact ? '0.5rem' : '0.625rem'} w="75%" rounded="md" className={compact ? 'mt-1' : 'mt-1.5'} />
+      ) : (
+        item.description && (
+          <p
+            className={classNames(
+              compact ? ds.type.captionSm : ds.type.caption,
+              compact ? 'mt-0.5 truncate' : 'mt-1 truncate',
+            )}
+          >
+            {item.description}
+          </p>
+        )
+      )}
+    </div>
+  );
+
+  const walletTopRow = (
+    <div className="flex items-start justify-between gap-1.5">
+      <div className={iconBoxClass}>
+        <span className={iconInnerClass}>{item.icon}</span>
+      </div>
+    </div>
+  );
+
+  const insightTopRow = (
+    <div className="flex items-start justify-between gap-1.5">
+      <div className={iconBoxClass}>
+        <span className={iconInnerClass}>{item.icon}</span>
+      </div>
+      <div className="flex min-w-0 flex-col items-end">{renderMetricValue(compact)}</div>
+    </div>
+  );
+
+  const walletInteractiveProps =
+    isWalletCard && item.onPress
+      ? {
+          onClick: handleWalletCardClick,
+          onKeyDown: handleWalletCardKeyDown,
+          role: 'button' as const,
+          tabIndex: 0,
+        }
+      : {};
+
+  if (compact) {
+    if (isWalletCard) {
+      return (
+        <div
+          className={classNames(cardClassName, item.onPress && 'cursor-pointer')}
+          {...walletInteractiveProps}
+        >
+          <div className={iconBoxClass}>
+            <span className={iconInnerClass}>{item.icon}</span>
+          </div>
+          <p className={classNames(ds.type.insightTitle, 'min-w-0 flex-1 truncate text-right')}>{item.title}</p>
+          {item.isLoading ? (
+            <Skeleton h="1rem" w="4.5rem" rounded="md" />
+          ) : (
+            <div className="flex shrink-0 items-center gap-1.5">
+              {walletToggle}
+              <div className="text-end leading-tight" dir="ltr">
+                {renderMetricValue(true)}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className={cardClassName}>
+        <div className={iconBoxClass}>
+          <span className={iconInnerClass}>{item.icon}</span>
+        </div>
+        <div className="min-w-0 flex-1 text-right">
+          <p className={classNames(ds.type.insightTitle, 'truncate')}>{item.title}</p>
+          {item.isLoading ? (
+            <Skeleton h="0.5rem" w="60%" rounded="md" className="mt-1" />
+          ) : (
+            item.description && <p className={classNames(ds.type.captionSm, 'mt-0.5 truncate')}>{item.description}</p>
+          )}
+        </div>
+        <div className="shrink-0">{renderMetricValue(true)}</div>
+      </div>
+    );
+  }
 
   if (isWalletCard) {
     return (
-      <div className={cardClassName}>
-        <div className="flex items-center justify-between gap-2">
-          <div
-            className={classNames(
-              'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
-              item.tint ?? ds.surface.primarySoft,
-            )}
-          >
-            <span className="text-primary">{item.icon}</span>
-          </div>
-          <button
-            type="button"
-            onClick={event => {
-              event.preventDefault();
-              event.stopPropagation();
-              item.visibilityToggle?.onToggle();
-            }}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-            aria-label={item.visibilityToggle?.isVisible ? 'پنهان کردن موجودی' : 'نمایش موجودی'}
-            aria-pressed={!item.visibilityToggle?.isVisible}
-          >
-            {item.visibilityToggle?.isVisible ? (
-              <EyeSlashIcon width={14} height={14} />
-            ) : (
-              <EyeIcon width={14} height={14} />
-            )}
-          </button>
-        </div>
-        <div className="min-w-0">
-          {item.isLoading ? (
-            <Skeleton h="1.5rem" w="5rem" rounded="md" />
-          ) : (
-            <p className="truncate text-lg font-bold tabular-nums leading-tight text-slate-900">{displayValue}</p>
-          )}
-          <p className={classNames(ds.type.cardTitle, 'mt-1.5')}>{item.title}</p>
-          {!item.isLoading && (
-            <p className={classNames(ds.type.caption, 'mt-0.5')}>{item.description}</p>
-          )}
-        </div>
+      <div
+        className={classNames(cardClassName, 'relative', item.onPress && 'cursor-pointer')}
+        {...walletInteractiveProps}
+      >
+        {walletToggle ? <div className="absolute top-3 left-3 z-20">{walletToggle}</div> : null}
+        {walletTopRow}
+        {walletFooter}
       </div>
     );
   }
 
   return (
-  <div className={cardClassName}>
-    <div className="flex items-center justify-between gap-2">
-      <div
-        className={classNames(
-          'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
-          item.tint ?? ds.surface.primarySoft,
-        )}
-      >
-        <span className="text-primary">{item.icon}</span>
-      </div>
-      <div className="flex min-w-0 items-center justify-end">
-        {item.isLoading ? (
-          <Skeleton h="1.75rem" w="3rem" rounded="md" />
-        ) : (
-          displayValue != null && (
-            <span className="text-2xl font-bold tabular-nums leading-none text-slate-900">{displayValue}</span>
-          )
-        )}
-      </div>
+    <div className={cardClassName}>
+      {glassFlash ? <InsightCardGlassFlash /> : null}
+      {insightTopRow}
+      {insightFooter}
     </div>
-    <div>
-      <p className={ds.type.cardTitle}>{item.title}</p>
-      {item.isLoading ? (
-        <Skeleton h="0.75rem" w="75%" rounded="md" className="mt-2" />
-      ) : (
-        <p className={classNames(ds.type.caption, 'mt-1 line-clamp-2')}>{item.description}</p>
-      )}
-    </div>
-  </div>
   );
 };
 
@@ -157,11 +509,16 @@ export const DsInsightCarousel = ({
   className,
   header,
   footer,
+  variant = 'responsive',
+  appearance = 'default',
 }: {
   items: DsInsightItem[];
   className?: string;
   header?: ReactNode;
   footer?: ReactNode;
+  /** responsive: کاروسل موبایل + گرید دسکتاپ · grid: فقط گرید · stack: ستون عمودی · carousel: فقط کاروسل */
+  variant?: 'responsive' | 'grid' | 'stack' | 'carousel';
+  appearance?: 'default' | 'workstation';
 }) => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -343,71 +700,127 @@ export const DsInsightCarousel = ({
   const wasDragged = () => pointerRef.current.dragDistance > DRAG_CLICK_THRESHOLD;
   const hasBandPadding = !!(header || footer);
 
+  const renderInsightItem = (item: DsInsightItem, index: number, fullWidth = false, compact = false) => {
+    const card = (
+      <InsightCard
+        item={item}
+        fullWidth={fullWidth}
+        appearance={appearance}
+        compact={compact}
+        shouldIgnorePress={!fullWidth ? wasDragged : undefined}
+      />
+    );
+
+    if (item.onPress && !item.visibilityToggle) {
+      return (
+        <button
+          key={index}
+          type="button"
+          className={classNames('block text-start', dsFocusRing, fullWidth && 'w-full')}
+          draggable={false}
+          onClick={() => {
+            if (!fullWidth && wasDragged()) return;
+            item.onPress!();
+            item.onClick?.();
+          }}
+        >
+          {card}
+        </button>
+      );
+    }
+
+    if (item.onPress) {
+      return (
+        <div key={index} className={fullWidth ? 'w-full shrink-0' : 'shrink-0'}>
+          {card}
+        </div>
+      );
+    }
+
+    if (item.href) {
+      return (
+        <Link
+          key={index}
+          href={item.href}
+          draggable={false}
+          className={fullWidth ? 'block w-full' : undefined}
+          onClick={event => {
+            if (!fullWidth && wasDragged()) {
+              event.preventDefault();
+              return;
+            }
+            item.onClick?.();
+          }}
+        >
+          {card}
+        </Link>
+      );
+    }
+
+    return (
+      <div key={index} className={fullWidth ? 'w-full' : 'shrink-0'}>
+        {card}
+      </div>
+    );
+  };
+
+  const showGrid = variant === 'grid' || variant === 'responsive';
+  const showCarousel = variant === 'carousel' || variant === 'responsive';
+  const showStack = variant === 'stack';
+
   return (
     <div className={className}>
+      {showStack && (
+        <div className="flex flex-col gap-2" role="region" aria-label="آمار عملکرد">
+          {items.map((item, index) => renderInsightItem(item, index, true, true))}
+        </div>
+      )}
+
+      {showGrid && (
+        <div className={classNames('grid grid-cols-4 gap-3', variant === 'responsive' && 'hidden md:grid')}>
+          {items.map((item, index) => renderInsightItem(item, index, true))}
+        </div>
+      )}
+
+      {showCarousel && (
       <div
         className={classNames(
           'relative -mx-4 overflow-x-clip',
           ds.surface.page,
-          hasBandPadding ? 'pb-4' : '-mb-6',
+          hasBandPadding ? 'pb-3' : '-mb-3',
+          variant === 'responsive' && 'md:hidden',
         )}
       >
-        {header ? <div className="px-4 pb-3 pt-3">{header}</div> : null}
+        {header ? <div className="px-4 pb-2.5 pt-2">{header}</div> : null}
         <div
           ref={viewportRef}
           dir={scrollDir}
+          role="region"
+          aria-label="آمار عملکرد"
           className={classNames(
             'relative z-[1] overflow-x-auto px-4 pt-0.5',
-            hasBandPadding ? 'pb-3' : 'pb-8',
+            hasBandPadding ? 'pb-2.5' : 'pb-5',
             'cursor-grab select-none touch-none no-scroll active:cursor-grabbing',
           )}
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
           <animated.div
             ref={trackRef}
-            className="flex w-max gap-3 will-change-transform"
+            className="flex w-max gap-2.5 will-change-transform"
             style={{
               x: spring.pull,
             }}
           >
             {items.map((item, index) => (
               <div key={index} className="shrink-0">
-                {item.onPress ? (
-                  <button
-                    type="button"
-                    className="block text-start"
-                    draggable={false}
-                    onClick={() => {
-                      if (wasDragged()) return;
-                      item.onPress!();
-                      item.onClick?.();
-                    }}
-                  >
-                    <InsightCard item={item} />
-                  </button>
-                ) : item.href ? (
-                  <Link
-                    href={item.href}
-                    draggable={false}
-                    onClick={event => {
-                      if (wasDragged()) {
-                        event.preventDefault();
-                        return;
-                      }
-                      item.onClick?.();
-                    }}
-                  >
-                    <InsightCard item={item} />
-                  </Link>
-                ) : (
-                  <InsightCard item={item} />
-                )}
+                {renderInsightItem(item, index)}
               </div>
             ))}
           </animated.div>
         </div>
         {footer ? <div className="px-4">{footer}</div> : null}
       </div>
+      )}
     </div>
   );
 };

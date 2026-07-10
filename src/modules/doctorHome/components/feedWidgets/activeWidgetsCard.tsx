@@ -1,6 +1,6 @@
 import classNames from '@/common/utils/classNames';
 import type { HamdastCatalogApp } from '@/modules/hamdast/apis/appList';
-import { DsCard } from '../../designSystem';
+import { DsCard, ds } from '../../designSystem';
 import type { ActiveWidgetGroup } from '../../utils/widgetCapabilitySections';
 import { RowChevron, AppCapabilityContent, WidgetAppIcon } from './widgetListRow';
 
@@ -14,17 +14,21 @@ const WidgetRow = ({
   app,
   onClick,
   isLast,
+  widgetShell = false,
 }: {
   app: HamdastCatalogApp;
   onClick: () => void;
   isLast?: boolean;
+  widgetShell?: boolean;
 }) => (
   <button
     type="button"
     onClick={onClick}
     className={classNames(
-      'flex w-full items-center gap-3 px-3 py-2.5 text-start transition-colors active:bg-slate-50 hover:bg-slate-50/80',
-      !isLast && 'border-b border-slate-100',
+      'flex w-full items-center gap-3 text-start',
+      ds.motion.listRow,
+      widgetShell ? 'px-5 py-3.5' : ds.layout.rowPadding,
+      !isLast && (widgetShell ? 'border-b border-slate-50' : 'border-b border-slate-100'),
     )}
   >
     <WidgetAppIcon app={app} size="compact" />
@@ -36,20 +40,24 @@ const WidgetRow = ({
 export const ActiveWidgetsCard = ({
   groups,
   onOpenApp,
+  widgetShell = false,
 }: {
   groups: ActiveWidgetGroup[];
   onOpenApp: (app: HamdastCatalogApp) => void;
+  widgetShell?: boolean;
 }) => (
-  <DsCard padding="none" className="overflow-hidden !shadow-sm">
+  <DsCard padding="none" variant={widgetShell ? 'widget' : 'default'} className="overflow-hidden">
     {groups.map((group, groupIndex) => (
       <div key={group.id}>
         <div
           className={classNames(
-            'border-b border-slate-100 bg-slate-50/70 px-3 py-1.5',
-            groupIndex === 0 && 'rounded-t-2xl',
+            ds.surface.neutralSoft,
+            widgetShell ? 'border-b border-slate-50' : 'border-b border-slate-100',
+            widgetShell ? 'px-5 py-2' : ds.layout.groupLabelPadding,
+            groupIndex === 0 && (widgetShell ? 'rounded-t-3xl' : 'rounded-t-2xl'),
           )}
         >
-          <span className="text-[11px] font-medium text-slate-500">{GROUP_LABEL[group.id]}</span>
+          <span className={ds.type.label}>{GROUP_LABEL[group.id]}</span>
         </div>
         {group.apps.map((app, index) => (
           <WidgetRow
@@ -57,6 +65,7 @@ export const ActiveWidgetsCard = ({
             app={app}
             onClick={() => onOpenApp(app)}
             isLast={index === group.apps.length - 1 && groupIndex === groups.length - 1}
+            widgetShell={widgetShell}
           />
         ))}
       </div>

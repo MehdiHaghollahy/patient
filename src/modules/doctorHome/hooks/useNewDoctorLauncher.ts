@@ -8,7 +8,17 @@ let latched: { userId: string; enabled: boolean } | null = null;
 let inFlightUserId: string | null = null;
 let inFlight: Promise<boolean> | null = null;
 
+const readFlag = (userId: string) => {
+  const enabled = growthbook.isOn('doctor-home:enable');
+  latched = { userId, enabled };
+  return enabled;
+};
+
 const resolveFlagForUser = async (userId: string) => {
+  if (latched?.userId === userId) {
+    return latched.enabled;
+  }
+
   if (inFlight && inFlightUserId === userId) {
     return inFlight;
   }
@@ -16,7 +26,9 @@ const resolveFlagForUser = async (userId: string) => {
   inFlightUserId = userId;
   inFlight = (async () => {
     const attributes = growthbook.getAttributes();
-    if (attributes.user_id !== userId) {
+    const currentUserId = attributes.user_id != null ? String(attributes.user_id) : null;
+
+    if (currentUserId !== userId) {
       growthbook.setAttributes({
         ...attributes,
         user_id: userId,
@@ -25,10 +37,11 @@ const resolveFlagForUser = async (userId: string) => {
       });
     }
 
-    await growthbook.refreshFeatures({ skipCache: true });
-    const enabled = growthbook.isOn('doctor-home:enable');
-    latched = { userId, enabled };
-    return enabled;
+    if (!growthbook.ready) {
+      await growthbook.loadFeatures({ timeout: 500 });
+    }
+
+    return readFlag(userId);
   })().finally(() => {
     if (inFlightUserId === userId) {
       inFlight = null;
@@ -43,16 +56,21 @@ export const useIsNewDoctorLauncherEnabled = () => {
   const user = useUserInfoStore(state => state.info);
   const isLogin = useUserInfoStore(state => state.isLogin);
   const pending = useUserInfoStore(state => state.pending);
-  const doctorProfilePending = useUserInfoStore(state => state.doctorProfilePending);
   const userId = user?.id;
   const customize = useCustomize(state => state.customize);
   const [isReady, setIsReady] = useState(growthbook.ready);
-  const [isResolved, setIsResolved] = useState(false);
-  const [isEnabled, setIsEnabled] = useState(false);
+  const [isResolved, setIsResolved] = useState(() => {
+    const id = userId != null && userId !== '' ? String(userId) : null;
+    return !!id && latched?.userId === id;
+  });
+  const [isEnabled, setIsEnabled] = useState(() => {
+    const id = userId != null && userId !== '' ? String(userId) : null;
+    return !!id && latched?.userId === id ? latched.enabled : false;
+  });
 
   const isDoctor = !customize.partnerKey && isDoctorUser(user);
   const normalizedUserId = userId != null && userId !== '' ? String(userId) : null;
-  const canResolve = isLogin && normalizedUserId != null && !pending && !doctorProfilePending && isReady;
+  const canResolve = isLogin && normalizedUserId != null && !pending && isReady;
 
   useEffect(() => {
     const unsubscribe = growthbook.subscribe(() => {
@@ -98,6 +116,10 @@ export const useIsNewDoctorLauncherEnabled = () => {
     return false;
   }
 
+  if (latched?.userId === normalizedUserId) {
+    return latched.enabled;
+  }
+
   return isResolved && isEnabled;
 };
 
@@ -105,13 +127,13 @@ export const useIsNewDoctorLauncherLoading = () => {
   const user = useUserInfoStore(state => state.info);
   const isLogin = useUserInfoStore(state => state.isLogin);
   const pending = useUserInfoStore(state => state.pending);
-  const doctorProfilePending = useUserInfoStore(state => state.doctorProfilePending);
   const userId = user?.id;
   const customize = useCustomize(state => state.customize);
   const [isReady, setIsReady] = useState(growthbook.ready);
 
   const isDoctor = !customize.partnerKey && isDoctorUser(user);
   const normalizedUserId = userId != null && userId !== '' ? String(userId) : null;
+  const hasLatchedForUser = latched?.userId === normalizedUserId;
 
   useEffect(() => {
     const unsubscribe = growthbook.subscribe(() => {
@@ -121,10 +143,5 @@ export const useIsNewDoctorLauncherLoading = () => {
     return () => unsubscribe?.();
   }, []);
 
-  return (
-    isDoctor &&
-    isLogin &&
-    !!normalizedUserId &&
-    (pending || doctorProfilePending || !isReady || (latched?.userId !== normalizedUserId && inFlightUserId !== normalizedUserId))
-  );
+  return isDoctor && isLogin && !!normalizedUserId && (pending || !isReady || !hasLatchedForUser);
 };

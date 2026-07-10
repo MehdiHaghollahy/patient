@@ -1,17 +1,16 @@
 import { useRouter } from 'next/router';
-import { useDoctorViewSwapActive } from './useDoctorViewSwapActive';
-import { useDoctorViewModeStore } from '../store/viewMode';
-
 import { ds } from '../designSystem/tokens';
+import { modeFromPath } from './useDoctorViewUrlSync';
+import { useDoctorViewSwapActive } from './useDoctorViewSwapActive';
+import { useIsNewDoctorLauncherLoading } from './useNewDoctorLauncher';
 
 export const DOCTOR_HOME_SURFACE_CLASS = ds.surface.page;
-
-const SWAP_ROUTES = ['/', '/apphome', '/_'];
 
 export const useDoctorViewHeaderSurface = () => {
   const router = useRouter();
   const swapActive = useDoctorViewSwapActive();
-  const mode = useDoctorViewModeStore(state => state.mode);
+  const doctorLauncherLoading = useIsNewDoctorLauncherLoading();
+  const showSwitcher = swapActive || doctorLauncherLoading;
 
-  return swapActive && SWAP_ROUTES.includes(router.pathname) && mode === 'doctor';
+  return showSwitcher && modeFromPath(router.pathname) === 'doctor';
 };

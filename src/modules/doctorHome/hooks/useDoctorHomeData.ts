@@ -3,7 +3,7 @@ import { useGetReview } from '@/common/apis/services/reviews/getReviews';
 import { useGetNotifications } from '@/modules/hamdast/apis/notifications';
 import { UserInfo } from '@/modules/login/store/userInfo';
 import moment from 'jalali-moment';
-import { useMemo } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 import { useDoctorPageView } from '../apis/pageView';
 import { useSanjeScore } from '../apis/sanjeScore';
 import { useUpcomingAppointments } from '../apis/upcomingAppointments';
@@ -70,6 +70,13 @@ export const useDoctorHomeData = (user?: UserInfo) => {
   const pageView = useDoctorPageView(slug);
   const rate = useRate({ slug: slug! }, { enabled: isDoctor && !!slug, staleTime: 5 * 60 * 1000 });
   const upcomingAppointments = useUpcomingAppointments(appointmentCenters, isDoctor, selectedDate);
+  const hasLoadedAppointmentsOnce = useRef(false);
+
+  useEffect(() => {
+    if (upcomingAppointments.isSuccess) {
+      hasLoadedAppointmentsOnce.current = true;
+    }
+  }, [upcomingAppointments.isSuccess]);
   const dateRange = useMemo(() => getDateRange(selectedDate), [selectedDate]);
   const createdAtBounds = useMemo(() => getTehranDayUtcBounds(selectedDate), [selectedDate]);
   const reviews = useGetReview(
@@ -145,6 +152,9 @@ export const useDoctorHomeData = (user?: UserInfo) => {
     shouldUseFallbackCount,
   ]);
 
+  const isAppointmentsInitialLoading =
+    upcomingAppointments.isLoading && !hasLoadedAppointmentsOnce.current;
+
   const isTodayCountLoading =
     todayCount == null &&
     (upcomingAppointments.isLoading ||
@@ -187,7 +197,8 @@ export const useDoctorHomeData = (user?: UserInfo) => {
     appointments: {
       items: appointmentItems,
       todayCount,
-      isLoading: upcomingAppointments.isLoading,
+      isLoading: isAppointmentsInitialLoading,
+      isFetching: upcomingAppointments.isFetching,
       isError: upcomingAppointments.isError,
     },
     reviews: {

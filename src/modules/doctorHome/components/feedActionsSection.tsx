@@ -1,50 +1,31 @@
 import classNames from '@/common/utils/classNames';
 import Switch from '@/common/components/atom/switch';
-import ChatIcon from '@/common/components/icons/chat';
 import { useUserInfoStore } from '@/modules/login/store/userInfo';
+import moment from 'jalali-moment';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useOnlineVisitServices, useToggleOnlineVisit } from '../apis/onlineVisit';
 import { DsButton, DsCard, DsSectionHeader, ds } from '../designSystem';
 import { DsDrawer } from './DsDrawer';
-import { sheetDrawerProps, useSheetRoute } from '../hooks/useSheetRoute';
+import { useDoctorHomeSheetHost, useSheetDrawerProps } from '../hooks/doctorHomeSheetLayout';
+import { useSheetRoute } from '../hooks/useSheetRoute';
 import { useSelectedCenterStore } from '../store/selectedCenter';
+import { useSelectedDateStore } from '../store/selectedDate';
 import { sendDoctorHomeEvent } from '../utils/analytics';
 import { DOCTOR_PANEL_URLS } from '../utils/doctorPanelUrls';
 import { formatDoctorCenterName, getClinicCenters, shouldShowClinicSection, shouldShowOnlineVisitSection } from '../utils/centers';
 import { appendUserIdToUrl } from '../utils/iframeUrl';
+import { dsFocusRing } from '../utils/a11y';
+import {
+  ChatIcon,
+  ClinicIcon,
+  ClockIcon,
+  TariffIcon,
+  VacationIcon,
+} from './icons';
+import { FeedStaggerItem } from './feedContentSwap';
 import { RowChevron } from './feedWidgets/widgetListRow';
 
 type ActionId = 'workhours' | 'vacation' | 'tariff';
-
-const ClockIcon = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden>
-    <circle cx="12" cy="12" r="8.5" />
-    <path d="M12 8v4.5l2.5 1.5" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const VacationIcon = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden>
-    <rect x="4" y="6" width="16" height="14" rx="2" />
-    <path d="M8 4v4M16 4v4M4 11h16" strokeLinecap="round" />
-  </svg>
-);
-
-const TariffIcon = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden>
-    <path d="M6 7h12l-1 10H7L6 7z" strokeLinejoin="round" />
-    <path d="M9 7V5a3 3 0 0 1 6 0v2" strokeLinecap="round" />
-  </svg>
-);
-
-const ClinicIcon = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden>
-    <path d="M4 20V9l8-5 8 5v11" strokeLinejoin="round" />
-    <path d="M9 20v-6h6v6" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const NEUTRAL_ICON = 'bg-slate-50 text-slate-600 ring-slate-200/80';
 
 const SUB_ACTIONS: {
   id: ActionId;
@@ -53,7 +34,7 @@ const SUB_ACTIONS: {
   description: string;
   url: string;
   analyticsFeature: 'shortcut_workhours' | 'shortcut_vacation' | 'shortcut_tariff';
-  icon: (props: { className?: string }) => JSX.Element;
+  icon: typeof ClockIcon;
 }[] = [
   {
     id: 'workhours',
@@ -93,8 +74,8 @@ const ActionIcon = ({
 }) => (
   <span
     className={classNames(
-      'flex shrink-0 items-center justify-center rounded-[11px] ring-1',
-      NEUTRAL_ICON,
+      ds.icon.containerAction,
+      ds.radius.inner,
       size === 'lg' ? 'h-10 w-10' : 'h-9 w-9',
     )}
   >
@@ -109,6 +90,7 @@ const PanelIframeDrawer = ({
   description,
   url,
   userId,
+  iframeKey,
 }: {
   open: boolean;
   onClose: () => void;
@@ -116,13 +98,33 @@ const PanelIframeDrawer = ({
   description: string;
   url: string;
   userId?: string | number | null;
-}) => (
-  <DsDrawer open={open} onOpenChange={o => { if (!o) onClose(); }} description={description} fullHeight className="!p-0">
-    {open && (
-      <iframe src={appendUserIdToUrl(url, userId)} title={title} className="min-h-0 w-full flex-1 border-0" />
-    )}
-  </DsDrawer>
-);
+  iframeKey: string;
+}) => {
+  const isSheetHost = useDoctorHomeSheetHost();
+
+  return (
+    <DsDrawer
+      nested
+      open={open && isSheetHost}
+      onOpenChange={o => {
+        if (!o) onClose();
+      }}
+      title={title}
+      description={description}
+      fullHeight
+      className="!p-0"
+    >
+      {open && (
+        <iframe
+          key={iframeKey}
+          src={appendUserIdToUrl(url, userId)}
+          title={title}
+          className="min-h-0 w-full flex-1 border-0"
+        />
+      )}
+    </DsDrawer>
+  );
+};
 
 const ActionSheetList = ({ onSelect }: { onSelect: (id: ActionId) => void }) => (
   <ul className="pb-6">
@@ -130,23 +132,27 @@ const ActionSheetList = ({ onSelect }: { onSelect: (id: ActionId) => void }) => 
       const Icon = action.icon;
       return (
         <li key={action.id}>
+          <FeedStaggerItem index={index}>
           <button
             type="button"
             onClick={() => onSelect(action.id)}
             className={classNames(
-              'flex w-full items-center gap-3 px-4 py-3 text-start transition-colors hover:bg-slate-50 active:bg-slate-50',
+              'flex w-full items-center gap-3 text-start',
+              ds.motion.listRow,
+              ds.layout.rowPaddingWide,
               index < SUB_ACTIONS.length - 1 && 'border-b border-slate-100',
             )}
           >
             <ActionIcon>
-              <Icon className="h-4 w-4" />
+              <Icon size="sm" />
             </ActionIcon>
             <span className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-800">{action.label}</p>
+              <p className={ds.type.cardTitle}>{action.label}</p>
               <p className={classNames(ds.type.caption, 'mt-0.5')}>{action.hint}</p>
             </span>
             <RowChevron />
           </button>
+          </FeedStaggerItem>
         </li>
       );
     })}
@@ -160,6 +166,7 @@ const CompactRow = ({
   onPress,
   trailing,
   isLast,
+  widgetShell = false,
 }: {
   icon: ReactNode;
   title: string;
@@ -167,23 +174,25 @@ const CompactRow = ({
   onPress?: () => void;
   trailing?: ReactNode;
   isLast?: boolean;
+  widgetShell?: boolean;
 }) => (
   <div
     className={classNames(
-      'flex items-center gap-2 px-3.5 py-2.5',
-      !isLast && 'border-b border-slate-100',
+      'flex items-center gap-2',
+      widgetShell ? 'px-5 py-3.5' : ds.layout.rowPadding,
+      !isLast && (widgetShell ? 'border-b border-slate-50' : 'border-b border-slate-100'),
     )}
   >
     <button
       type="button"
       onClick={onPress}
-      className="flex min-w-0 flex-1 items-center gap-3 text-start transition-colors active:opacity-80"
+      className={classNames('flex min-w-0 flex-1 items-center gap-3 text-start', ds.motion.listRow)}
     >
       <ActionIcon size="lg">
         {icon}
       </ActionIcon>
       <span className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-slate-800">{title}</p>
+        <p className={ds.type.cardTitle}>{title}</p>
         {subtitle ? <p className={classNames(ds.type.caption, 'mt-0.5 line-clamp-1')}>{subtitle}</p> : null}
       </span>
       {!trailing ? <RowChevron /> : null}
@@ -194,8 +203,12 @@ const CompactRow = ({
 
 export const FeedActionsSection = ({
   onlineVisit,
+  widgetShell = false,
+  hideSectionHeader = false,
 }: {
   onlineVisit?: { userCenterId?: string; hasOnlineVisitCenter: boolean };
+  widgetShell?: boolean;
+  hideSectionHeader?: boolean;
 }) => {
   const user = useUserInfoStore(state => state.info);
   const userId = user?.id;
@@ -205,9 +218,18 @@ export const FeedActionsSection = ({
   const workhoursSheet = useSheetRoute('workhours');
   const vacationSheet = useSheetRoute('vacation');
   const tariffSheet = useSheetRoute('tariff');
+  const activationDrawerProps = useSheetDrawerProps(activationSheet);
+  const onlineDrawerProps = useSheetDrawerProps(onlineSheet);
+  const clinicDrawerProps = useSheetDrawerProps(clinicSheet);
 
   const selectedCenterId = useSelectedCenterStore(state => state.selectedCenterId);
   const setSelectedCenterId = useSelectedCenterStore(state => state.setSelectedCenterId);
+  const selectedDate = useSelectedDateStore(state => state.selectedDate);
+  const selectedMoment = moment(selectedDate, 'YYYY-MM-DD');
+  const isToday = selectedMoment.isSame(moment(), 'day');
+  const sectionTitle = isToday
+    ? 'برنامه امروز'
+    : `برنامه ${selectedMoment.clone().locale('fa').format('jD jMMMM')}`;
 
   const clinics = useMemo(() => getClinicCenters(user), [user]);
   const showOnlineVisit = shouldShowOnlineVisitSection(selectedCenterId);
@@ -243,6 +265,13 @@ export const FeedActionsSection = ({
   };
 
   const sheets = { workhours: workhoursSheet, vacation: vacationSheet, tariff: tariffSheet } as const;
+  const actionIds = Object.keys(sheets) as ActionId[];
+
+  const closePanelSheets = (except?: ActionId) => {
+    actionIds.forEach(actionId => {
+      if (actionId !== except) sheets[actionId].closeSheet();
+    });
+  };
 
   const openAction = (id: ActionId) => {
     const action = SUB_ACTIONS.find(item => item.id === id);
@@ -250,8 +279,14 @@ export const FeedActionsSection = ({
     sendDoctorHomeEvent(userId, action.analyticsFeature);
     onlineSheet.closeSheet();
     clinicSheet.closeSheet();
+    closePanelSheets(id);
     sheets[id].openSheet();
   };
+
+  const activePanelId = actionIds.find(actionId => sheets[actionId].open) ?? null;
+  const activePanelAction = activePanelId
+    ? SUB_ACTIONS.find(action => action.id === activePanelId) ?? null
+    : null;
 
   const openOnlineSheet = () => {
     sendDoctorHomeEvent(userId, 'online_visit_actions_open');
@@ -271,12 +306,18 @@ export const FeedActionsSection = ({
 
   return (
     <section dir="rtl">
-      <DsSectionHeader title="اقدامات" />
-      <DsCard padding="none" className="overflow-hidden">
+      {!hideSectionHeader && <DsSectionHeader title={sectionTitle} />}
+      <DsCard padding="none" variant={widgetShell ? 'widget' : 'default'} className="overflow-hidden">
+        {hideSectionHeader && (
+          <div className="border-b border-slate-100 px-3 py-2.5">
+            <p className={ds.type.section}>{sectionTitle}</p>
+          </div>
+        )}
         {showOnlineVisit && onlineVisit && (
           <CompactRow
-            icon={<ChatIcon className="h-[18px] w-[18px]" />}
+            icon={<ChatIcon size="md" />}
             title="ویزیت آنلاین"
+            widgetShell={widgetShell}
             subtitle={
               !onlineVisit.hasOnlineVisitCenter
                 ? 'فعال‌سازی نوبت آنلاین'
@@ -294,13 +335,14 @@ export const FeedActionsSection = ({
                     checked={isActive}
                     onChange={e => handleToggle(e.target.checked)}
                     disabled={isLoading || toggleMutation.isLoading}
+                    aria-label="فعال‌سازی نوبت‌دهی آنلاین"
                   />
-                  <button type="button" aria-label="مدیریت ویزیت آنلاین" onClick={openOnlineSheet} className="shrink-0 p-1">
+                  <button type="button" aria-label="تنظیمات ویزیت آنلاین" onClick={openOnlineSheet} className={classNames('shrink-0 p-1', dsFocusRing)}>
                     <RowChevron />
                   </button>
                 </>
               ) : (
-                <DsButton variant="primary" className="!px-2.5 !py-1 !text-[11px]" onClick={() => activationSheet.openSheet()}>
+                <DsButton variant="primary" className="!h-8 !min-h-0 !px-2.5 !py-1" onClick={() => activationSheet.openSheet()}>
                   شروع
                 </DsButton>
               )
@@ -317,9 +359,10 @@ export const FeedActionsSection = ({
 
         {showClinicRow && (
           <CompactRow
-            icon={<ClinicIcon className="h-[18px] w-[18px]" />}
+            icon={<ClinicIcon size="md" />}
             title={clinicTitle}
             subtitle={clinicSubtitle}
+            widgetShell={widgetShell}
             isLast
             onPress={() => {
               sendDoctorHomeEvent(userId, 'clinic_actions_open');
@@ -330,13 +373,13 @@ export const FeedActionsSection = ({
       </DsCard>
 
       <DsDrawer
-        {...sheetDrawerProps(activationSheet)}
+        {...activationDrawerProps}
         title="فعال‌سازی ویزیت آنلاین"
         description="راهنمای فعال‌سازی"
       >
         <div className="flex flex-col items-center gap-4 px-4 pb-10 pt-2 text-center">
           <ActionIcon size="lg">
-            <ChatIcon className="h-5 w-5" />
+            <ChatIcon size="lg" />
           </ActionIcon>
           <p className={classNames(ds.type.cardBody, 'leading-6')}>
             برای فعال‌سازی ویزیت آنلاین، ابتدا پروفایل خود را در پنل پزشکی پذیرش۲۴ تکمیل کنید.
@@ -345,7 +388,7 @@ export const FeedActionsSection = ({
       </DsDrawer>
 
       <DsDrawer
-        {...sheetDrawerProps(onlineSheet)}
+        {...onlineDrawerProps}
         title="ویزیت آنلاین"
         description="مدیریت نوبت آنلاین"
       >
@@ -353,12 +396,12 @@ export const FeedActionsSection = ({
       </DsDrawer>
 
       <DsDrawer
-        {...sheetDrawerProps(clinicSheet)}
+        {...clinicDrawerProps}
         title={clinicTitle}
         description="مدیریت مطب"
       >
         {clinics.length > 1 && (
-          <div className="mb-1 flex gap-2 overflow-x-auto px-3 pb-2 pt-1 no-scroll">
+          <div role="group" aria-label="انتخاب مطب" className="mb-1 flex gap-2 overflow-x-auto px-3 pb-2 pt-1 no-scroll">
             {clinics.map(clinic => {
               const clinicId = String(clinic.id);
               const isSelected = String(activeClinic?.id) === clinicId;
@@ -368,18 +411,23 @@ export const FeedActionsSection = ({
                 <button
                   key={clinicId}
                   type="button"
+                  aria-pressed={isSelected}
                   onClick={() => {
                     setSelectedCenterId(clinicId);
                     sendDoctorHomeEvent(userId, 'clinic_picker_select', { center_id: clinicId });
                   }}
                   className={classNames(
-                    'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors',
+                    'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5',
+                    ds.motion.surface,
+                    ds.motion.press,
+                    ds.type.label,
+                    dsFocusRing,
                     isSelected
-                      ? 'border-slate-300 bg-slate-100 text-slate-800'
+                      ? classNames(ds.surface.muted, 'border-slate-300 text-slate-800')
                       : 'border-slate-200 text-slate-600 hover:bg-slate-50',
                   )}
                 >
-                  <ClinicIcon className="h-3.5 w-3.5" />
+                  <ClinicIcon size="xs" />
                   {name}
                 </button>
               );
@@ -389,17 +437,17 @@ export const FeedActionsSection = ({
         <ActionSheetList onSelect={openAction} />
       </DsDrawer>
 
-      {SUB_ACTIONS.map(action => (
+      {activePanelAction && (
         <PanelIframeDrawer
-          key={`drawer-${action.id}`}
-          open={sheets[action.id].open}
-          onClose={sheets[action.id].closeSheet}
-          title={action.label}
-          description={action.description}
-          url={action.url}
+          open={!!activePanelAction}
+          onClose={() => closePanelSheets()}
+          title={activePanelAction.label}
+          description={activePanelAction.description}
+          url={activePanelAction.url}
           userId={userId}
+          iframeKey={activePanelAction.id}
         />
-      ))}
+      )}
     </section>
   );
 };

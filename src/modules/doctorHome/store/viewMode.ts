@@ -20,7 +20,7 @@ interface DoctorViewModeStore {
 }
 
 export const useDoctorViewModeStore = create<DoctorViewModeStore>(set => ({
-  mode: readStoredMode(),
+  mode: 'doctor',
   setMode: mode => {
     if (typeof window !== 'undefined') {
       sessionStorage.setItem(DOCTOR_VIEW_MODE_STORAGE_KEY, mode);

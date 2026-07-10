@@ -1,5 +1,6 @@
 import type { HamdastCatalogApp } from '@/modules/hamdast/apis/appList';
-import { DsCard } from '../../designSystem';
+import classNames from '@/common/utils/classNames';
+import { DsCard, ds } from '../../designSystem';
 import { RowChevron, WidgetListRow } from './widgetListRow';
 
 export const SocialBannerSection = ({
@@ -18,7 +19,7 @@ export const SocialBannerSection = ({
       const isActive = installedKeys.has(app.app_key);
 
       return (
-        <DsCard key={app.app_key} padding="none" className="overflow-hidden !border-primary/15 !bg-primary/[0.03] !shadow-sm">
+        <DsCard key={app.app_key} padding="none" className={classNames('overflow-hidden !shadow-sm', ds.surface.socialAccent)}>
           <WidgetListRow
             app={app}
             onClick={() => (isActive ? onOpenApp(app) : onActivate(app))}

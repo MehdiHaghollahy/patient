@@ -23,8 +23,13 @@ export const HamdastWidget = ({
   onChangeWidget?: (action?: 'add' | 'remove' | 'update') => void;
 }) => {
   const widgetInfo = useGetWidgetInfo({ app_id }, { enabled: false });
+  const skipCancelOnCloseRef = useRef(false);
   const { handleClose, handleOpen, modalProps } = useModal({
     onClose: () => {
+      if (skipCancelOnCloseRef.current) {
+        skipCancelOnCloseRef.current = false;
+        return;
+      }
       cancel();
     },
   });
@@ -88,7 +93,6 @@ export const HamdastWidget = ({
         },
         { withCredentials: true },
       );
-      handleClose();
       if (widgetInfo.data?.data?.successful_popup?.title) {
         handlePreviewWidgetOpen();
       }
@@ -121,6 +125,7 @@ export const HamdastWidget = ({
         '*',
       );
     } finally {
+      skipCancelOnCloseRef.current = true;
       handleClose();
       setIsLoading(false);
     }
@@ -163,6 +168,7 @@ export const HamdastWidget = ({
         '*',
       );
     } finally {
+      skipCancelOnCloseRef.current = true;
       handleClose();
       setIsCancelLoading(false);
     }

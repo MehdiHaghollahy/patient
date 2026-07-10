@@ -2,12 +2,9 @@ import classNames from '@/common/utils/classNames';
 import type { HamdastCatalogApp } from '@/modules/hamdast/apis/appList';
 import { ds } from '../../designSystem';
 import type { ReactNode } from 'react';
+import { RowChevronIcon } from '../icons';
 
-export const RowChevron = () => (
-  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4 shrink-0 text-slate-300" aria-hidden>
-    <path d="M13 5l-5 5 5 5" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
+export const RowChevron = () => <RowChevronIcon size="sm" />;
 
 export const getCapabilityTitle = (app: HamdastCatalogApp) =>
   app.subtitle?.trim() || app.title || app.app_key;
@@ -73,7 +70,7 @@ export const AppCapabilityContent = ({
     <span className={classNames('min-w-0 flex-1', className)}>
       <p
         className={classNames(
-          dense ? 'text-xs font-medium leading-4 text-slate-700' : ds.type.cardTitle,
+          dense ? classNames(ds.type.label, 'leading-4 text-slate-700') : ds.type.cardTitle,
           'line-clamp-2',
           !dense && 'leading-5',
         )}
@@ -82,16 +79,13 @@ export const AppCapabilityContent = ({
       </p>
       {brand ? (
         <p
-          className={classNames(
-            dense ? 'text-[11px] font-normal text-slate-500' : ds.type.caption,
-            'mt-0.5 truncate',
-          )}
+          className={classNames(ds.type.caption, 'mt-0.5 truncate')}
         >
           {brand}
         </p>
       ) : null}
       {soon ? (
-        <span className="mt-1 inline-block rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+        <span className={classNames('mt-1 inline-block rounded-md px-1.5 py-0.5', ds.surface.warningSoft, ds.type.label, 'text-amber-700')}>
           به‌زودی
         </span>
       ) : null}
@@ -113,7 +107,8 @@ export const WidgetListRow = ({
   soon?: boolean;
 }) => {
   const rowClass = classNames(
-    'flex w-full items-center gap-3 px-4 py-3.5 text-start transition-colors',
+    'flex w-full items-center gap-3 px-4 py-3.5 text-start',
+    ds.motion.listRow,
     !isLast && 'border-b border-slate-100',
     onClick && 'active:bg-slate-50 hover:bg-slate-50/80',
   );

@@ -66,7 +66,13 @@ export type DoctorHomeFeedItem =
   | {
       id: string;
       type: 'appointments_list';
-      data: { items: UpcomingAppointment[]; todayCount: number | null };
+      data: {
+        items: UpcomingAppointment[];
+        todayCount: number | null;
+        isTodayCountLoading?: boolean;
+        isAppointmentsLoading?: boolean;
+        isAppointmentsFetching?: boolean;
+      };
     }
   | {
       id: string;

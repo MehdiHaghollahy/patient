@@ -1,8 +1,9 @@
 /** صفحات پنل پزشکان (providers) داخل iframe */
 export const DOCTOR_PANEL_URLS = {
-  workhours: 'https://providers.paziresh24.com/app/workhours/',
+  myPatients: 'https://providers.paziresh24.com/app/my-patients/',
+  workhours: 'https://providers.paziresh24.com/app/workhour/',
   vacation: 'https://providers.paziresh24.com/app/vacation/',
-  tariffs: 'https://providers.paziresh24.com/app/service/',
+  tariffs: 'https://providers.paziresh24.com/app/services/',
 } as const;
 
 /** داشبورد نظرات بیماران (راوی) */

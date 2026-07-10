@@ -1,7 +1,12 @@
+import { useClientMounted } from '@/common/hooks/useClientMounted';
+import { isMobileViewport } from '@/common/hooks/useResponsive';
 import {
   isDoctorDeviceCached,
   redirectCachedDoctorHome,
 } from '@/common/utils/doctorDeviceCache';
+import { isDoctorHomeRedirectPath } from '@/common/utils/doctorHomePaths';
+import { isPatientViewModeStored } from '@/modules/doctorHome/store/viewMode';
+import { isSpaPatientView, useSpaPatientViewStore } from '@/modules/doctorHome/utils/spaPatientView';
 import { useUserInfoStore, UserInfo } from '@/modules/login/store/userInfo';
 import { useRouter } from 'next/router';
 import { useEffect, useRef, useLayoutEffect } from 'react';
@@ -10,23 +15,30 @@ import { growthbook } from 'src/pages/_app';
 export const isDoctorUser = (user: UserInfo) =>
   user.provider?.job_title === 'doctor' || user.is_doctor === true || !!user.provider?.slug;
 
-const REDIRECT_PATHS = ['/', '/apphome'];
-
 export const useDoctorHomeRedirect = () => {
   const router = useRouter();
+  const mounted = useClientMounted();
   const user = useUserInfoStore(state => state.info);
   const isLogin = useUserInfoStore(state => state.isLogin);
   const pending = useUserInfoStore(state => state.pending);
   const doctorProfilePending = useUserInfoStore(state => state.doctorProfilePending);
+  const spaPatientView = useSpaPatientViewStore(state => state.active);
   const hasRedirected = useRef(false);
 
-  const isCachedDoctor = isDoctorDeviceCached();
+  const isCachedDoctor = mounted && isDoctorDeviceCached();
   const isDoctor = isCachedDoctor || (isLogin && isDoctorUser(user));
+  // Soft SPA patient switch (in-memory or sessionStorage from switcher click).
+  const isPatientOptOut = spaPatientView || (mounted && isPatientViewModeStored());
+  // Desktop: never. Mobile soft-nav: never bounce if patient opted out.
+  // Cold/hard redirect paths ignore patient storage (see redirectCachedDoctorHome).
   const shouldRedirect =
+    mounted &&
     !pending &&
     !doctorProfilePending &&
-    REDIRECT_PATHS.includes(router.pathname) &&
-    isDoctor;
+    isDoctorHomeRedirectPath(router.pathname) &&
+    isDoctor &&
+    isMobileViewport() &&
+    !isPatientOptOut;
 
   useEffect(() => {
     if (!growthbook.ready) {
@@ -36,22 +48,29 @@ export const useDoctorHomeRedirect = () => {
 
   useEffect(() => {
     if (isLogin || isCachedDoctor) {
-      router.prefetch('/_/');
+      void router.prefetch('/_/');
     }
   }, [isLogin, isCachedDoctor, router]);
 
+  // Cold-load / refresh: hard redirect before paint — mobile only, ignores patient storage.
   useLayoutEffect(() => {
     if (hasRedirected.current) return;
+    if (isSpaPatientView()) return;
     if (redirectCachedDoctorHome()) {
       hasRedirected.current = true;
     }
   }, []);
 
   useLayoutEffect(() => {
+    if (isPatientOptOut) {
+      hasRedirected.current = false;
+      return;
+    }
     if (hasRedirected.current) return;
     if (!shouldRedirect) return;
+    if (!router.isReady) return;
 
     hasRedirected.current = true;
-    router.replace('/_/');
-  }, [shouldRedirect, router]);
+    void router.replace('/_/');
+  }, [shouldRedirect, isPatientOptOut, router, router.isReady, router.pathname]);
 };

@@ -1,6 +1,7 @@
 import type { HamdastCatalogApp } from '@/modules/hamdast/apis/appList';
+import classNames from '@/common/utils/classNames';
 import { getWidgetActionLabel } from '../../hooks/useInstalledAppKeys';
-import { DsButton, DsCard } from '../../designSystem';
+import { DsButton, DsCard, ds } from '../../designSystem';
 import { AppCapabilityContent } from './widgetListRow';
 import { getBadgeLabel } from '../../utils/widgetCapabilitySections';
 
@@ -23,11 +24,11 @@ export const AutomationCardsSection = ({
 
       return (
         <DsCard key={app.app_key} padding="md" className="!shadow-sm">
-          <div className="flex items-start gap-3">
+          <div className={classNames('flex items-start', ds.layout.listRowGap)}>
             <AppCapabilityContent app={app} soon={soon} />
             <DsButton
               variant={isActive ? 'ghost' : 'primary'}
-              className="!h-8 shrink-0 !min-h-0 !px-3 !py-1.5 !text-xs"
+              className="!h-8 shrink-0 !min-h-0 !px-3 !py-1.5"
               onClick={() => (soon ? onOpenApp(app) : isActive ? onOpenApp(app) : onActivate(app))}
             >
               {actionLabel}

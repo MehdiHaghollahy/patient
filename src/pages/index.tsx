@@ -6,6 +6,12 @@ import { withServerUtils } from '@/common/hoc/withServerUtils';
 import { useDoctorHomeRedirectLoading } from '@/common/hooks/useDoctorHomeRedirectLoading';
 import { getServerSideGrowthBookContext } from '@/common/helper/getServerSideGrowthBookContext';
 import { getHost, HeaderBag } from '@/common/utils/getHost';
+import {
+  DoctorViewSwitcher,
+  useDoctorViewRouteGuard,
+  useDoctorViewSwapActive,
+  useIsNewDoctorLauncherLoading,
+} from '@/modules/doctorHome';
 import { GrowthBook } from '@growthbook/growthbook-react';
 import dynamic from 'next/dynamic';
 import { GetServerSidePropsContext, NextApiRequest } from 'next/types';
@@ -22,22 +28,36 @@ const HomePageBody = dynamic(() => import('@/modules/home/views/homePageBody'), 
 });
 
 const Home = ({ fragmentComponents }: any) => {
+  const swapActive = useDoctorViewSwapActive();
+  const doctorLauncherLoading = useIsNewDoctorLauncherLoading();
   const showRedirectLoading = useDoctorHomeRedirectLoading();
   const setIsOpenSuggestion = useSearchStore(state => state.setIsOpenSuggestion);
+
+  useDoctorViewRouteGuard();
 
   useLayoutEffect(() => {
     setIsOpenSuggestion(false);
   }, [setIsOpenSuggestion]);
 
-  if (showRedirectLoading) {
-    return (
-      <div className="flex items-center justify-center flex-grow min-h-[50vh]">
-        <Loading />
-      </div>
-    );
-  }
+  // New-design rollout doctors always get the view switcher on home.
+  const showSwitcher = swapActive || doctorLauncherLoading;
 
-  return <HomePageBody fragmentComponents={fragmentComponents} plasmicSearchComponent={PlasmicSearch} />;
+  return (
+    <>
+      {showSwitcher && (
+        <div className="bg-white">
+          <DoctorViewSwitcher className="px-0 pb-1 pt-3" />
+        </div>
+      )}
+      {showRedirectLoading ? (
+        <div className="flex min-h-[50vh] flex-grow items-center justify-center">
+          <Loading />
+        </div>
+      ) : (
+        <HomePageBody fragmentComponents={fragmentComponents} plasmicSearchComponent={PlasmicSearch} />
+      )}
+    </>
+  );
 };
 
 Home.getLayout = function getLayout(page: ReactElement) {

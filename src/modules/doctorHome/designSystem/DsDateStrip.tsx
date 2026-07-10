@@ -8,6 +8,7 @@ import { useDoctorVacations } from '../apis/vacations';
 import { useSelectedDateStore } from '../store/selectedDate';
 import { useSelectedCenterStore } from '../store/selectedCenter';
 import { getVacationCenterTargets } from '../utils/centers';
+import { dsFocusRing, prefersReducedMotion } from '../utils/a11y';
 import { useUserInfoStore } from '@/modules/login/store/userInfo';
 import { ds } from './tokens';
 
@@ -15,8 +16,8 @@ const BUFFER = 30;
 const SNAP_MAX = 7;
 const SNAP_SPRING = { tension: 320, friction: 30, mass: 1 };
 /** Fixed pill around the selected day — must not scale with viewport cell width */
-const SLOT_FRAME_W = 48;
-const SLOT_FRAME_H = 65;
+const SLOT_FRAME_W = 44;
+const SLOT_FRAME_H = 59;
 const SLOT_FRAME_OFFSET_Y = 0;
 
 export interface DsDateStripRef {
@@ -57,6 +58,7 @@ export const DsDateStrip = forwardRef<DsDateStripRef, { className?: string; mark
   };
 
   const playTick = () => {
+    if (prefersReducedMotion()) return;
     const ctx = getAudioCtx();
     if (!ctx) return;
     const t = ctx.currentTime;
@@ -75,7 +77,27 @@ export const DsDateStrip = forwardRef<DsDateStripRef, { className?: string; mark
 
 
   const selectedMoment = useMemo(() => moment(selectedDate, 'YYYY-MM-DD'), [selectedDate]);
-  const isToday = selectedMoment.isSame(today, 'day');
+  const [liveMessage, setLiveMessage] = useState('');
+
+  useEffect(() => {
+    const label = selectedMoment.clone().locale('fa').format('dddd jD jMMMM jYYYY');
+    setLiveMessage(`${label} انتخاب شد`);
+  }, [selectedDate, selectedMoment]);
+
+  const formatDayAriaLabel = (
+    day: moment.Moment,
+    flags: { isSelected: boolean; isHoliday: boolean; isVacation: boolean; hasNotification: boolean; isDayToday: boolean },
+  ) => {
+    const dateLabel = day.clone().locale('fa').format('dddd jD jMMMM');
+    const parts = [
+      flags.isDayToday && 'امروز',
+      flags.isSelected && 'انتخاب‌شده',
+      flags.isHoliday && 'تعطیل',
+      flags.isVacation && 'مرخصی',
+      flags.hasNotification && 'دارای اعلان',
+    ].filter(Boolean);
+    return parts.length > 0 ? `${dateLabel}، ${parts.join('، ')}` : dateLabel;
+  };
 
   const user = useUserInfoStore(s => s.info);
   const vacationCenterTargets = useMemo(() => getVacationCenterTargets(user ?? undefined), [user]);
@@ -235,6 +257,10 @@ export const DsDateStrip = forwardRef<DsDateStripRef, { className?: string; mark
 
   return (
     <div className={classNames('select-none', className)}>
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {liveMessage}
+      </div>
+      <div className="relative" role="group" aria-label="انتخاب تاریخ">
       {/*
         Wrapper is relative so overlays (indicator + edge fades) can be
         positioned on top of the scroll container without being clipped or
@@ -266,9 +292,17 @@ export const DsDateStrip = forwardRef<DsDateStripRef, { className?: string; mark
                 const hasNotification = markedDates?.has(isoDate) ?? false;
 
                 return (
-                  <div
+                  <button
                     key={isoDate}
-                    className="relative flex shrink-0 flex-col items-center gap-1 py-1"
+                    type="button"
+                    aria-pressed={isSelected}
+                    aria-label={formatDayAriaLabel(day, { isSelected, isHoliday, isVacation, hasNotification, isDayToday })}
+                    onPointerDown={event => event.stopPropagation()}
+                    onClick={() => setSelectedDate(isoDate)}
+                    className={classNames(
+                      'relative flex shrink-0 flex-col items-center gap-0.5 border-0 bg-transparent py-0.5',
+                      dsFocusRing,
+                    )}
                     style={{ width: cellW }}
                   >
                     {isMonthBoundary && (
@@ -277,7 +311,7 @@ export const DsDateStrip = forwardRef<DsDateStripRef, { className?: string; mark
                         style={{ width: 0 }}
                       >
                         <span
-                          className="text-[8px] font-medium text-slate-400 whitespace-nowrap"
+                          className={classNames(ds.type.monthLabel, 'whitespace-nowrap')}
                           style={{ transform: 'rotate(-90deg)', display: 'block' }}
                         >
                           {day.clone().locale('fa').format('jMMMM')}
@@ -299,9 +333,10 @@ export const DsDateStrip = forwardRef<DsDateStripRef, { className?: string; mark
 
                     <span
                       className={classNames(
-                        'flex h-9 w-9 items-center justify-center text-sm font-bold',
+                        'flex h-8 w-8 items-center justify-center',
+                        ds.type.dateNum,
                         isSelected
-                          ? classNames(ds.radius.pill, isHoliday ? 'bg-red-500 text-white shadow-[0_3px_12px_rgba(239,68,68,0.45)]' : 'bg-primary text-white shadow-[0_3px_12px_rgba(56,97,251,0.45)]')
+                          ? classNames(ds.radius.pill, isHoliday ? 'bg-red-500 text-white shadow-[0_2px_10px_rgba(239,68,68,0.4)]' : 'bg-primary text-white shadow-[0_2px_10px_rgba(56,97,251,0.4)]')
                           : isHoliday
                           ? 'text-red-500'
                           : isDayToday
@@ -325,8 +360,9 @@ export const DsDateStrip = forwardRef<DsDateStripRef, { className?: string; mark
                             ? 'bg-primary'
                             : 'bg-transparent',
                       )}
+                      aria-hidden
                     />
-                  </div>
+                  </button>
                 );
               })}
             </animated.div>
@@ -365,7 +401,7 @@ export const DsDateStrip = forwardRef<DsDateStripRef, { className?: string; mark
           </div>
         )}
       </div>
-
+      </div>
     </div>
   );
 },

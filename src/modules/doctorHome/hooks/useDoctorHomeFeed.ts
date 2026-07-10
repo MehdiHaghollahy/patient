@@ -42,17 +42,6 @@ export const useDoctorHomeFeed = (user?: UserInfo) => {
       });
     }
 
-    if (data.appointments.items.length > 0) {
-      feed.push({
-        id: 'appointments-list',
-        type: 'appointments_list',
-        data: {
-          items: data.appointments.items,
-          todayCount: data.appointments.todayCount,
-        },
-      });
-    }
-
     feed.push({
       id: 'actions',
       type: 'actions',
@@ -65,6 +54,18 @@ export const useDoctorHomeFeed = (user?: UserInfo) => {
               },
             }
           : {}),
+      },
+    });
+
+    feed.push({
+      id: 'appointments-list',
+      type: 'appointments_list',
+      data: {
+        items: data.appointments.items,
+        todayCount: data.appointments.todayCount,
+        isTodayCountLoading: data.stats.isTodayCountLoading,
+        isAppointmentsLoading: data.appointments.isLoading,
+        isAppointmentsFetching: data.appointments.isFetching,
       },
     });
 

@@ -1,5 +1,6 @@
 import { convertLongToCompactNumber } from '@/common/utils/convertLongToCompactNumber';
 import { useUserInfoStore } from '@/modules/login/store/userInfo';
+import { ds } from '../designSystem/tokens';
 import { sendDoctorHomeEvent } from '../utils/analytics';
 import { StatCard } from './statCard';
 
@@ -31,7 +32,7 @@ export const StatsRow = ({
   const userId = useUserInfoStore(state => state.info?.id);
 
   return (
-    <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 scrollbar-hide">
+    <div className={ds.layout.statsRowStrip}>
       <StatCard
         label="امتیاز عملکرد"
         value={performanceScore != null ? `${performanceScore} از ۱۰۰` : null}

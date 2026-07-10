@@ -49,7 +49,13 @@ const shortenCenterAddress = (center: ProviderCenter): string | undefined => {
 
 
 export const getDoctorCenterOptions = (user?: UserInfo): DoctorCenterOption[] => {
-  const centers = (user?.provider?.centers ?? []).filter((center: ProviderCenter) => center.id);
+  const onlineCenter = getOnlineVisitCenter(user);
+  const clinicCenters = getClinicCenters(user);
+  const centers = [
+    ...(onlineCenter ? [onlineCenter] : []),
+    ...clinicCenters,
+  ].filter((center: ProviderCenter) => center.id);
+
   if (centers.length === 0) return [];
 
   return [

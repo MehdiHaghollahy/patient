@@ -1,61 +1,73 @@
 import Skeleton from '@/common/components/atom/skeleton';
 import classNames from '@/common/utils/classNames';
+import { ReactNode } from 'react';
 import { ds } from '../designSystem';
+import { FeedContentSwap } from './feedContentSwap';
+import { dsFocusRing } from '../utils/a11y';
 import { sendDoctorHomeEvent } from '../utils/analytics';
+import { CalendarIcon } from './icons';
 
 interface AppointmentsCountRowProps {
   title: string;
-  subtitle?: string;
   count: number | null;
   isLoading?: boolean;
   userId?: string;
   onPress: () => void;
+  trailing?: ReactNode;
   className?: string;
+  widgetShell?: boolean;
 }
 
 export const AppointmentsCountRow = ({
   title,
-  subtitle,
   count,
   isLoading,
   userId,
   onPress,
+  trailing,
   className,
-}: AppointmentsCountRowProps) => (
-  <button
-    type="button"
-    onClick={() => {
-      sendDoctorHomeEvent(userId, 'stat_appointments', { count });
-      onPress();
-    }}
-    className={classNames(
-      ds.radius.card,
-      ds.shadow.sm,
-      'flex w-full items-center gap-3 border border-slate-100/90 bg-white px-3 py-3 text-start',
-      'transition-[box-shadow,transform] duration-200 ease-out active:scale-[0.99]',
-      className,
-    )}
-  >
-    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#DBE8FE] text-primary">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
-        <rect x="3" y="4" width="18" height="18" rx="2" />
-        <path d="M16 2v4M8 2v4M3 10h18" strokeLinecap="round" />
-      </svg>
-    </div>
+  widgetShell = false,
+}: AppointmentsCountRowProps) => {
+  const countLabel = count != null ? `${count.toLocaleString('fa-IR')} نوبت` : null;
+  const rowAriaLabel = countLabel
+    ? `مشاهده همه نوبت‌ها، ${countLabel}`
+    : 'مشاهده همه نوبت‌ها';
 
-    <div className="min-w-0 flex-1">
-      <p className="text-sm font-bold text-slate-800">{title}</p>
-      {subtitle ? <p className={classNames(ds.type.caption, 'mt-0.5')}>{subtitle}</p> : null}
-    </div>
-
-    <div className="flex shrink-0 items-center">
-      {isLoading ? (
-        <Skeleton h="1.25rem" w="2.5rem" rounded="md" />
-      ) : (
-        <span className="text-base font-bold tabular-nums text-slate-900">
-          {count != null ? count.toLocaleString('fa-IR') : '—'}
+  return (
+    <div className={classNames('flex items-center gap-2', widgetShell ? 'px-5 py-4' : ds.layout.rowPadding, className)}>
+      <button
+        type="button"
+        aria-label={rowAriaLabel}
+        onClick={() => {
+          sendDoctorHomeEvent(userId, 'stat_appointments', { count });
+          onPress();
+        }}
+        className={classNames('flex min-w-0 flex-1 items-center gap-3 text-start', ds.motion.listRow, dsFocusRing)}
+      >
+        <span
+          className={classNames(
+            'h-10 w-10',
+            ds.icon.containerAction,
+            ds.radius.inner,
+          )}
+        >
+          <CalendarIcon size="md" />
         </span>
-      )}
+
+        <span className="min-w-0 flex-1">
+          <p className={ds.type.cardTitle}>{title}</p>
+          {isLoading ? (
+            <Skeleton h="0.75rem" w="3rem" rounded="full" className="mt-0.5" />
+          ) : countLabel ? (
+            <FeedContentSwap swapKey={countLabel} variant="pop">
+              <p className={classNames(ds.type.caption, 'mt-0.5')}>{countLabel}</p>
+            </FeedContentSwap>
+          ) : (
+            <p className={classNames(ds.type.caption, 'mt-0.5')}>—</p>
+          )}
+        </span>
+      </button>
+      {trailing}
     </div>
-  </button>
-);
+  );
+};

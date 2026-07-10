@@ -8,4 +8,5 @@ export { DoctorViewSwap } from './components/doctorViewSwap';
 export { useDoctorViewModeStore } from './store/viewMode';
 export type { DoctorViewMode } from './store/viewMode';
 export { useDoctorViewSwapActive } from './hooks/useDoctorViewSwapActive';
+export { useDoctorViewRouteGuard } from './hooks/useDoctorViewRouteGuard';
 export { useIsNewDoctorLauncherEnabled, useIsNewDoctorLauncherLoading } from './hooks/useNewDoctorLauncher';

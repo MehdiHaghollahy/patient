@@ -174,6 +174,7 @@ export const AppFrame = ({
       {app?.id && isEmbeddedModal && (
         <>
           <HamdastPayment app_key={appKey} app_name={app.display_name?.fa} icon={app?.icon} iframeRef={iframeRef} />
+          <HamdastSubscriptionPayment ref={subscriptionPaymentRef} app_key={appKey} app_name={app.display_name?.fa} icon={app?.icon} iframeRef={iframeRef} />
           <HamdastAuth app_key={appKey} iframeRef={iframeRef} />
           <HamdastFlow iframeRef={iframeRef} />
         </>

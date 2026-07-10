@@ -16,7 +16,8 @@ import { prefetchOneApp } from '@/modules/hamdast/utils/prefetchOneApp';
 import { useNotificationPermission } from '@/common/hooks/useNotificationPermission';
 import { useUserInfoStore } from '@/modules/login/store/userInfo';
 import { useQueryClient } from '@tanstack/react-query';
-import { DoctorViewSwap, useDoctorViewSwapActive, useIsNewDoctorLauncherLoading } from '@/modules/doctorHome';
+import { DoctorViewSwitcher, useDoctorViewRouteGuard, useDoctorViewSwapActive, useIsNewDoctorLauncherLoading } from '@/modules/doctorHome';
+import { DoctorLauncherContent } from '@/modules/doctorHome/components/doctorLauncherContent';
 import { ds } from '@/modules/doctorHome/designSystem/tokens';
 
 const Page = () => {
@@ -27,6 +28,9 @@ const Page = () => {
   const doctorLauncherLoading = useIsNewDoctorLauncherLoading();
   const { isResolving, shouldShowLauncher } = useLauncherPageAccess();
   const info = useUserInfoStore(state => state.info);
+  const showSwitcher = swapActive || doctorLauncherLoading;
+
+  useDoctorViewRouteGuard();
   const { isSupported, hasPermission, showModal, openModal, closeModal, checkPermission } = useNotificationPermission();
 
   useEffect(() => {
@@ -55,12 +59,19 @@ const Page = () => {
         onClose={closeModal}
         onSuccess={handleSuccess}
       />
-      {doctorLauncherLoading ? (
-        <div className="flex min-h-[50vh] flex-grow items-center justify-center">
-          <Loading />
-        </div>
-      ) : swapActive ? (
-        <DoctorViewSwap />
+      {showSwitcher ? (
+        <>
+          <div className={ds.surface.page}>
+            <DoctorViewSwitcher className="px-0 pb-1 pt-3" />
+          </div>
+          {doctorLauncherLoading ? (
+            <div className="flex min-h-[50vh] flex-grow items-center justify-center">
+              <Loading />
+            </div>
+          ) : (
+            <DoctorLauncherContent />
+          )}
+        </>
       ) : (
         <>
           {isResolving && (
